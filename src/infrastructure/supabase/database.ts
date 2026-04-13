@@ -44,12 +44,16 @@ export async function getOrCreateWeekPlan(
   userId: string,
   weekStart: string,
 ): Promise<string> {
-  const { data: existing } = await supabase
+  console.log("[BLOCK6] getOrCreateWeekPlan:", { userId, weekStart });
+
+  const { data: existing, error: findError } = await supabase
     .from("week_plans")
     .select("id")
     .eq("user_id", userId)
     .eq("week_start", weekStart)
     .maybeSingle();
+
+  console.log("[BLOCK6] findWeekPlan result:", { existing, findError });
 
   if (existing) return existing.id;
 
@@ -58,6 +62,8 @@ export async function getOrCreateWeekPlan(
     .insert({ user_id: userId, week_start: weekStart })
     .select("id")
     .single();
+
+  console.log("[BLOCK6] createWeekPlan result:", { created, error });
 
   if (error) throw new Error(error.message);
   return created!.id;
@@ -84,7 +90,11 @@ export async function fetchBlocksForWeek(
     .eq("week_plan_id", plan.id);
 
   if (error) throw new Error(error.message);
-  return (data as DbBlock[]).map(dbBlockToEntity);
+  return (data as DbBlock[]).map((db) => {
+    const block = dbBlockToEntity(db);
+    // Use weekStart (date string) as weekPlanId for consistency with local mode
+    return createBlock({ ...block, weekPlanId: weekStart });
+  });
 }
 
 export async function upsertBlock(
@@ -96,16 +106,21 @@ export async function upsertBlock(
   title: string,
   description: string,
 ): Promise<Block> {
+  console.log("[BLOCK6] upsertBlock called:", { userId, weekStart, dayOfWeek, slot, blockType, title });
+
   const weekPlanId = await getOrCreateWeekPlan(userId, weekStart);
+  console.log("[BLOCK6] weekPlanId:", weekPlanId);
 
   // Check if block exists for this slot
-  const { data: existing } = await supabase
+  const { data: existing, error: findErr } = await supabase
     .from("blocks")
     .select("id")
     .eq("week_plan_id", weekPlanId)
     .eq("day_of_week", dayOfWeek)
     .eq("slot", slot)
     .maybeSingle();
+
+  console.log("[BLOCK6] existing block:", { existing, findErr });
 
   if (existing) {
     const { data, error } = await supabase
@@ -119,8 +134,10 @@ export async function upsertBlock(
       .select("*")
       .single();
 
+    console.log("[BLOCK6] update result:", { data, error });
     if (error) throw new Error(error.message);
-    return dbBlockToEntity(data as DbBlock);
+    const updated = dbBlockToEntity(data as DbBlock);
+    return createBlock({ ...updated, weekPlanId: weekStart });
   }
 
   const { data, error } = await supabase
@@ -137,8 +154,10 @@ export async function upsertBlock(
     .select("*")
     .single();
 
+  console.log("[BLOCK6] insert result:", { data, error });
   if (error) throw new Error(error.message);
-  return dbBlockToEntity(data as DbBlock);
+  const inserted = dbBlockToEntity(data as DbBlock);
+  return createBlock({ ...inserted, weekPlanId: weekStart });
 }
 
 export async function updateBlockStatus(
