@@ -43,7 +43,9 @@ export function DependencyProvider({
       updateBlock: new UpdateBlockUseCase(repositories.blockRepo),
       updateBlockStatus: new UpdateBlockStatusUseCase(repositories.blockRepo),
       writeDiary: new WriteDiaryUseCase(repositories.diaryRepo),
-      createWeekReview: new CreateWeekReviewUseCase(repositories.weekReviewRepo),
+      createWeekReview: new CreateWeekReviewUseCase(
+        repositories.weekReviewRepo,
+      ),
       getWeekSummary: new GetWeekSummaryUseCase(repositories.blockRepo),
     }),
     [repositories],

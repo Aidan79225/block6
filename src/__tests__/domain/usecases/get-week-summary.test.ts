@@ -14,10 +14,46 @@ describe("GetWeekSummaryUseCase", () => {
   it("returns correct summary for a week with 4 blocks (2 completed)", async () => {
     const repo = makeRepo();
     const blocks: Block[] = [
-      { id: "b1", weekPlanId: "week-1", dayOfWeek: 1, slot: 1, blockType: BlockType.Core,   title: "T1", description: "", status: BlockStatus.Completed },
-      { id: "b2", weekPlanId: "week-1", dayOfWeek: 1, slot: 2, blockType: BlockType.Core,   title: "T2", description: "", status: BlockStatus.Planned },
-      { id: "b3", weekPlanId: "week-1", dayOfWeek: 2, slot: 1, blockType: BlockType.Rest,   title: "T3", description: "", status: BlockStatus.Completed },
-      { id: "b4", weekPlanId: "week-1", dayOfWeek: 2, slot: 2, blockType: BlockType.Buffer, title: "T4", description: "", status: BlockStatus.Planned },
+      {
+        id: "b1",
+        weekPlanId: "week-1",
+        dayOfWeek: 1,
+        slot: 1,
+        blockType: BlockType.Core,
+        title: "T1",
+        description: "",
+        status: BlockStatus.Completed,
+      },
+      {
+        id: "b2",
+        weekPlanId: "week-1",
+        dayOfWeek: 1,
+        slot: 2,
+        blockType: BlockType.Core,
+        title: "T2",
+        description: "",
+        status: BlockStatus.Planned,
+      },
+      {
+        id: "b3",
+        weekPlanId: "week-1",
+        dayOfWeek: 2,
+        slot: 1,
+        blockType: BlockType.Rest,
+        title: "T3",
+        description: "",
+        status: BlockStatus.Completed,
+      },
+      {
+        id: "b4",
+        weekPlanId: "week-1",
+        dayOfWeek: 2,
+        slot: 2,
+        blockType: BlockType.Buffer,
+        title: "T4",
+        description: "",
+        status: BlockStatus.Planned,
+      },
     ];
     vi.mocked(repo.findByWeekPlan).mockResolvedValue(blocks);
 

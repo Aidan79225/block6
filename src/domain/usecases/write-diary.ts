@@ -13,7 +13,10 @@ export class WriteDiaryUseCase {
   constructor(private readonly repo: DiaryRepository) {}
 
   async execute(input: WriteDiaryInput): Promise<DiaryEntry> {
-    const existing = await this.repo.findByUserAndDate(input.userId, input.entryDate);
+    const existing = await this.repo.findByUserAndDate(
+      input.userId,
+      input.entryDate,
+    );
 
     if (existing) {
       const updated: DiaryEntry = {

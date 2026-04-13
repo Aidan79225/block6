@@ -12,7 +12,14 @@ describe("ThemeToggle", () => {
   it("calls onToggle when clicked", async () => {
     const user = userEvent.setup();
     let called = false;
-    render(<ThemeToggle theme="dark" onToggle={() => { called = true; }} />);
+    render(
+      <ThemeToggle
+        theme="dark"
+        onToggle={() => {
+          called = true;
+        }}
+      />,
+    );
     await user.click(screen.getByRole("button", { name: /theme/i }));
     expect(called).toBe(true);
   });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { CreateWeekPlanUseCase } from "@/domain/usecases/create-week-plan";
 import { WeekPlanRepository } from "@/domain/repositories/week-plan-repository";
 import { WeekPlan } from "@/domain/entities/week-plan";

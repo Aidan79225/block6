@@ -22,7 +22,14 @@ describe("StatusToggle", () => {
   it("calls onChange when a status is clicked", async () => {
     const user = userEvent.setup();
     let newStatus: BlockStatus | null = null;
-    render(<StatusToggle status={BlockStatus.Planned} onChange={(s) => { newStatus = s; }} />);
+    render(
+      <StatusToggle
+        status={BlockStatus.Planned}
+        onChange={(s) => {
+          newStatus = s;
+        }}
+      />,
+    );
     await user.click(screen.getByText("completed"));
     expect(newStatus).toBe(BlockStatus.Completed);
   });

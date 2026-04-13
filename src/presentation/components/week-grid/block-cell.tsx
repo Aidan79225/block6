@@ -22,10 +22,22 @@ const statusIcon: Record<BlockStatus, string> = {
 export function BlockCell({ block, onClick }: BlockCellProps) {
   if (!block) {
     return (
-      <button onClick={onClick}
-        style={{ background: "var(--color-bg-tertiary)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
-          color: "var(--color-text-muted)", cursor: "pointer", padding: "8px", minHeight: "60px",
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+      <button
+        onClick={onClick}
+        style={{
+          background: "var(--color-bg-tertiary)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-sm)",
+          color: "var(--color-text-muted)",
+          cursor: "pointer",
+          padding: "8px",
+          minHeight: "60px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "18px",
+        }}
+      >
         +
       </button>
     );
@@ -35,15 +47,39 @@ export function BlockCell({ block, onClick }: BlockCellProps) {
   const icon = statusIcon[block.status];
 
   return (
-    <button onClick={onClick}
-      style={{ background: "var(--color-bg-secondary)", borderLeft: `3px solid ${borderColor}`,
-        borderTop: "1px solid var(--color-border)", borderRight: "1px solid var(--color-border)",
-        borderBottom: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
-        color: "var(--color-text-primary)", cursor: "pointer", padding: "6px 8px", minHeight: "60px",
-        display: "flex", flexDirection: "column", justifyContent: "space-between",
-        textAlign: "left", fontSize: "12px", opacity: block.status === BlockStatus.Skipped ? 0.5 : 1 }}>
+    <button
+      onClick={onClick}
+      style={{
+        background: "var(--color-bg-secondary)",
+        borderLeft: `3px solid ${borderColor}`,
+        borderTop: "1px solid var(--color-border)",
+        borderRight: "1px solid var(--color-border)",
+        borderBottom: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-sm)",
+        color: "var(--color-text-primary)",
+        cursor: "pointer",
+        padding: "6px 8px",
+        minHeight: "60px",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        textAlign: "left",
+        fontSize: "12px",
+        opacity: block.status === BlockStatus.Skipped ? 0.5 : 1,
+      }}
+    >
       <span style={{ fontWeight: 500, fontSize: "11px" }}>{block.title}</span>
-      {icon && <span style={{ alignSelf: "flex-end", fontSize: "12px", color: borderColor }}>{icon}</span>}
+      {icon && (
+        <span
+          style={{
+            alignSelf: "flex-end",
+            fontSize: "12px",
+            color: borderColor,
+          }}
+        >
+          {icon}
+        </span>
+      )}
     </button>
   );
 }

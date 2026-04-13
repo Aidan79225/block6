@@ -5,14 +5,17 @@ import { useState, useEffect, useCallback } from "react";
 export type Theme = "dark" | "light";
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("block6-theme") as Theme | null;
+      return stored ?? "dark";
+    }
+    return "dark";
+  });
 
   useEffect(() => {
-    const stored = localStorage.getItem("block6-theme") as Theme | null;
-    const initial = stored ?? "dark";
-    setThemeState(initial);
-    document.documentElement.setAttribute("data-theme", initial);
-  }, []);
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);

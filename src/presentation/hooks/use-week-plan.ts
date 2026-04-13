@@ -14,11 +14,19 @@ export function useWeekPlan() {
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
 
   const goToPreviousWeek = useCallback(() => {
-    setWeekStart((prev) => { const d = new Date(prev); d.setDate(d.getDate() - 7); return d; });
+    setWeekStart((prev) => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() - 7);
+      return d;
+    });
   }, []);
 
   const goToNextWeek = useCallback(() => {
-    setWeekStart((prev) => { const d = new Date(prev); d.setDate(d.getDate() + 7); return d; });
+    setWeekStart((prev) => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + 7);
+      return d;
+    });
   }, []);
 
   return { weekStart, goToPreviousWeek, goToNextWeek };

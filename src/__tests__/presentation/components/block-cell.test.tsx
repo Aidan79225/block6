@@ -8,7 +8,16 @@ describe("BlockCell", () => {
   it("renders block title and type color", () => {
     render(
       <BlockCell
-        block={{ id: "b1", weekPlanId: "wp-1", dayOfWeek: 1, slot: 1, blockType: BlockType.Core, title: "專案開發", description: "", status: BlockStatus.Planned }}
+        block={{
+          id: "b1",
+          weekPlanId: "wp-1",
+          dayOfWeek: 1,
+          slot: 1,
+          blockType: BlockType.Core,
+          title: "專案開發",
+          description: "",
+          status: BlockStatus.Planned,
+        }}
         onClick={() => {}}
       />,
     );
@@ -23,7 +32,14 @@ describe("BlockCell", () => {
   it("calls onClick when clicked", async () => {
     const user = userEvent.setup();
     let clicked = false;
-    render(<BlockCell block={null} onClick={() => { clicked = true; }} />);
+    render(
+      <BlockCell
+        block={null}
+        onClick={() => {
+          clicked = true;
+        }}
+      />,
+    );
     await user.click(screen.getByText("+"));
     expect(clicked).toBe(true);
   });
@@ -31,7 +47,16 @@ describe("BlockCell", () => {
   it("shows completion indicator for completed blocks", () => {
     render(
       <BlockCell
-        block={{ id: "b1", weekPlanId: "wp-1", dayOfWeek: 1, slot: 1, blockType: BlockType.Core, title: "Done", description: "", status: BlockStatus.Completed }}
+        block={{
+          id: "b1",
+          weekPlanId: "wp-1",
+          dayOfWeek: 1,
+          slot: 1,
+          blockType: BlockType.Core,
+          title: "Done",
+          description: "",
+          status: BlockStatus.Completed,
+        }}
         onClick={() => {}}
       />,
     );

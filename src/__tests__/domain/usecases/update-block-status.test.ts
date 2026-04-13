@@ -33,7 +33,9 @@ describe("UpdateBlockStatusUseCase", () => {
     expect(result.id).toBe("block-1");
     expect(result.status).toBe(BlockStatus.Completed);
     expect(repo.update).toHaveBeenCalledOnce();
-    expect(repo.update).toHaveBeenCalledWith(expect.objectContaining({ status: BlockStatus.Completed }));
+    expect(repo.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: BlockStatus.Completed }),
+    );
   });
 
   it("throws 'Block not found' when block does not exist", async () => {
@@ -41,6 +43,8 @@ describe("UpdateBlockStatusUseCase", () => {
     vi.mocked(repo.findById).mockResolvedValue(null);
 
     const useCase = new UpdateBlockStatusUseCase(repo);
-    await expect(useCase.execute("missing-id", BlockStatus.Completed)).rejects.toThrow("Block not found");
+    await expect(
+      useCase.execute("missing-id", BlockStatus.Completed),
+    ).rejects.toThrow("Block not found");
   });
 });

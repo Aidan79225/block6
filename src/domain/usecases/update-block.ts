@@ -1,4 +1,9 @@
-import { Block, BlockStatus, BlockType, createBlock } from "@/domain/entities/block";
+import {
+  Block,
+  BlockStatus,
+  BlockType,
+  createBlock,
+} from "@/domain/entities/block";
 import { BlockRepository } from "@/domain/repositories/block-repository";
 
 export interface UpdateBlockInput {
@@ -16,7 +21,7 @@ export class UpdateBlockUseCase {
   async execute(input: UpdateBlockInput): Promise<Block> {
     const blocks = await this.repo.findByWeekPlan(input.weekPlanId);
     const existing = blocks.find(
-      (b) => b.dayOfWeek === input.dayOfWeek && b.slot === input.slot
+      (b) => b.dayOfWeek === input.dayOfWeek && b.slot === input.slot,
     );
 
     if (existing) {

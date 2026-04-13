@@ -15,10 +15,25 @@ export function WeekGrid({ blocks, onBlockClick }: WeekGridProps) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px", flex: 1 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(7, 1fr)",
+        gap: "4px",
+        flex: 1,
+      }}
+    >
       {DAY_LABELS.map((label, i) => (
-        <div key={`header-${i}`}
-          style={{ textAlign: "center", color: "var(--color-text-secondary)", fontSize: "13px", fontWeight: 600, padding: "8px 0" }}>
+        <div
+          key={`header-${i}`}
+          style={{
+            textAlign: "center",
+            color: "var(--color-text-secondary)",
+            fontSize: "13px",
+            fontWeight: 600,
+            padding: "8px 0",
+          }}
+        >
           {label}
         </div>
       ))}
@@ -27,7 +42,11 @@ export function WeekGrid({ blocks, onBlockClick }: WeekGridProps) {
           const dayOfWeek = dayIndex + 1;
           const block = findBlock(dayOfWeek, slot);
           return (
-            <BlockCell key={`${dayOfWeek}-${slot}`} block={block} onClick={() => onBlockClick(dayOfWeek, slot, block)} />
+            <BlockCell
+              key={`${dayOfWeek}-${slot}`}
+              block={block}
+              onClick={() => onBlockClick(dayOfWeek, slot, block)}
+            />
           );
         }),
       )}

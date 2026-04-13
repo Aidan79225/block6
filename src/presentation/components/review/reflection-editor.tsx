@@ -6,11 +6,29 @@ interface ReflectionEditorProps {
   onSave: (reflection: string) => void;
 }
 
-export function ReflectionEditor({ reflection: initialReflection, onSave }: ReflectionEditorProps) {
+export function ReflectionEditor({
+  reflection: initialReflection,
+  onSave,
+}: ReflectionEditorProps) {
   const [reflection, setReflection] = useState(initialReflection);
   return (
-    <div style={{ background: "var(--color-bg-secondary)", borderRadius: "var(--radius-md)", padding: "20px", border: "1px solid var(--color-border)" }}>
-      <h3 style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginBottom: "12px" }}>週反思</h3>
+    <div
+      style={{
+        background: "var(--color-bg-secondary)",
+        borderRadius: "var(--radius-md)",
+        padding: "20px",
+        border: "1px solid var(--color-border)",
+      }}
+    >
+      <h3
+        style={{
+          fontSize: "14px",
+          color: "var(--color-text-secondary)",
+          marginBottom: "12px",
+        }}
+      >
+        週反思
+      </h3>
       <textarea
         value={reflection}
         onChange={(e) => setReflection(e.target.value)}

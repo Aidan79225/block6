@@ -20,8 +20,8 @@ export class GetWeekSummaryUseCase {
     const blocks = await this.repo.findByWeekPlan(weekPlanId);
 
     const byType: Record<BlockType, TypeStats> = {
-      [BlockType.Core]:   { total: 0, completed: 0 },
-      [BlockType.Rest]:   { total: 0, completed: 0 },
+      [BlockType.Core]: { total: 0, completed: 0 },
+      [BlockType.Rest]: { total: 0, completed: 0 },
       [BlockType.Buffer]: { total: 0, completed: 0 },
     };
 
@@ -36,7 +36,8 @@ export class GetWeekSummaryUseCase {
     }
 
     const totalBlocks = blocks.length;
-    const completionRate = totalBlocks === 0 ? 0 : completedBlocks / totalBlocks;
+    const completionRate =
+      totalBlocks === 0 ? 0 : completedBlocks / totalBlocks;
 
     return { totalBlocks, completedBlocks, completionRate, byType };
   }
