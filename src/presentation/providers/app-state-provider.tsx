@@ -206,18 +206,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           blockType,
           title,
           description,
-        ).then((saved) => {
-          // Sync the server-generated ID back
-          setBlocks((prev) =>
-            prev.map((b) =>
-              b.weekPlanId === weekKey &&
-              b.dayOfWeek === dayOfWeek &&
-              b.slot === slot
-                ? saved
-                : b,
-            ),
-          );
-        });
+        )
+          .then((saved) => {
+            // Sync the server-generated ID back
+            setBlocks((prev) =>
+              prev.map((b) =>
+                b.weekPlanId === weekKey &&
+                b.dayOfWeek === dayOfWeek &&
+                b.slot === slot
+                  ? saved
+                  : b,
+              ),
+            );
+          })
+          .catch((err) => {
+            console.error("[BLOCK6] Failed to save block to Supabase:", err);
+          });
       }
     },
     [user],

@@ -49,7 +49,7 @@ export async function getOrCreateWeekPlan(
     .select("id")
     .eq("user_id", userId)
     .eq("week_start", weekStart)
-    .single();
+    .maybeSingle();
 
   if (existing) return existing.id;
 
@@ -74,7 +74,7 @@ export async function fetchBlocksForWeek(
     .select("id")
     .eq("user_id", userId)
     .eq("week_start", weekStart)
-    .single();
+    .maybeSingle();
 
   if (!plan) return [];
 
@@ -105,7 +105,7 @@ export async function upsertBlock(
     .eq("week_plan_id", weekPlanId)
     .eq("day_of_week", dayOfWeek)
     .eq("slot", slot)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     const { data, error } = await supabase
@@ -178,7 +178,7 @@ export async function fetchDiary(
     .select("line_1, line_2, line_3")
     .eq("user_id", userId)
     .eq("entry_date", dateKey)
-    .single();
+    .maybeSingle();
 
   if (!data) return null;
   const d = data as DbDiary;
@@ -197,7 +197,7 @@ export async function upsertDiary(
     .select("id")
     .eq("user_id", userId)
     .eq("entry_date", dateKey)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     const { error } = await supabase
@@ -228,7 +228,7 @@ export async function fetchReflection(
     .select("id")
     .eq("user_id", userId)
     .eq("week_start", weekStart)
-    .single();
+    .maybeSingle();
 
   if (!plan) return "";
 
@@ -236,7 +236,7 @@ export async function fetchReflection(
     .from("week_reviews")
     .select("reflection")
     .eq("week_plan_id", plan.id)
-    .single();
+    .maybeSingle();
 
   return data?.reflection ?? "";
 }
@@ -252,7 +252,7 @@ export async function upsertReflection(
     .from("week_reviews")
     .select("id")
     .eq("week_plan_id", weekPlanId)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     const { error } = await supabase
