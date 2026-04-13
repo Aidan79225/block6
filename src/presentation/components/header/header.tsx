@@ -41,7 +41,7 @@ export function Header({
           whiteSpace: "nowrap",
         }}
       >
-        BLOCK6
+        The Block 6
       </h1>
       <WeekNavigator
         weekStart={weekStart}

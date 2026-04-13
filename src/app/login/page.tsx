@@ -57,7 +57,7 @@ export default function LoginPage() {
             textAlign: "center",
           }}
         >
-          BLOCK6
+          The Block 6
         </h1>
         <p
           style={{

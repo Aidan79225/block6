@@ -4,7 +4,7 @@ import { AppStateProvider } from "@/presentation/providers/app-state-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BLOCK6 Time Manager",
+  title: "The Block 6",
   description: "6區塊黃金比例時間分配法",
 };
 
