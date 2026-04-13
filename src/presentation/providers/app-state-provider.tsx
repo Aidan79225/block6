@@ -18,9 +18,10 @@ interface DiaryLines {
 }
 
 interface AppState {
-  blocks: Block[];
+  allBlocks: Block[];
+  getBlocksForWeek: (weekKey: string) => Block[];
   saveBlock: (
-    weekPlanId: string,
+    weekKey: string,
     dayOfWeek: number,
     slot: number,
     title: string,
@@ -99,9 +100,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     saveToStorage({ blocks, diaryEntries, reflection });
   }, [blocks, diaryEntries, reflection]);
 
+  const getBlocksForWeek = useCallback(
+    (weekKey: string): Block[] => {
+      return blocks.filter((b) => b.weekPlanId === weekKey);
+    },
+    [blocks],
+  );
+
   const saveBlock = useCallback(
     (
-      weekPlanId: string,
+      weekKey: string,
       dayOfWeek: number,
       slot: number,
       title: string,
@@ -110,7 +118,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     ) => {
       setBlocks((prev) => {
         const existing = prev.find(
-          (b) => b.dayOfWeek === dayOfWeek && b.slot === slot,
+          (b) =>
+            b.weekPlanId === weekKey &&
+            b.dayOfWeek === dayOfWeek &&
+            b.slot === slot,
         );
         if (existing) {
           return prev.map((b) =>
@@ -121,7 +132,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         }
         const newBlock = createBlock({
           id: crypto.randomUUID(),
-          weekPlanId,
+          weekPlanId: weekKey,
           dayOfWeek,
           slot,
           blockType,
@@ -165,7 +176,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppStateContext.Provider
       value={{
-        blocks,
+        allBlocks: blocks,
+        getBlocksForWeek,
         saveBlock,
         updateStatus,
         diaryEntries,

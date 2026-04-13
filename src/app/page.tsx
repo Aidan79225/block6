@@ -36,8 +36,11 @@ function isTodayInWeek(weekStart: Date, dayOfWeek: number): boolean {
 export default function DashboardPage() {
   const { theme, toggleTheme } = useTheme();
   const { weekStart, goToPreviousWeek, goToNextWeek } = useWeekPlan();
-  const { blocks, saveBlock, updateStatus, saveDiary, getDiary } =
+  const { getBlocksForWeek, saveBlock, updateStatus, saveDiary, getDiary } =
     useAppState();
+
+  const weekKey = weekStart.toISOString().split("T")[0];
+  const blocks = getBlocksForWeek(weekKey);
   const [selected, setSelected] = useState<SelectedCell | null>(null);
   const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
   const [mobileView, setMobileView] = useState<"day" | "overview">("day");
@@ -60,7 +63,7 @@ export default function DashboardPage() {
   ) => {
     if (!selected) return;
     saveBlock(
-      "local-plan",
+      weekKey,
       selected.dayOfWeek,
       selected.slot,
       title,

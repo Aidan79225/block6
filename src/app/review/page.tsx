@@ -5,10 +5,15 @@ import { CompletionStats } from "@/presentation/components/review/completion-sta
 import { BlockTypeBreakdown } from "@/presentation/components/review/block-type-breakdown";
 import { ReflectionEditor } from "@/presentation/components/review/reflection-editor";
 import { useAppState } from "@/presentation/providers/app-state-provider";
+import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
 import { BlockStatus, BlockType } from "@/domain/entities/block";
 
 export default function ReviewPage() {
-  const { blocks, reflection, setReflection } = useAppState();
+  const { weekStart } = useWeekPlan();
+  const { getBlocksForWeek, reflection, setReflection } = useAppState();
+
+  const weekKey = weekStart.toISOString().split("T")[0];
+  const blocks = getBlocksForWeek(weekKey);
 
   const totalBlocks = blocks.length;
   const completedBlocks = blocks.filter(
