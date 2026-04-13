@@ -85,7 +85,10 @@ function loadFromStorage(): PersistedData {
 
 function saveToStorage(data: PersistedData): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const json = JSON.stringify(data);
+    localStorage.setItem(STORAGE_KEY, json);
+    cachedRaw = json;
+    cachedData = data;
   } catch {
     // Storage full or unavailable
   }
@@ -94,6 +97,8 @@ function saveToStorage(data: PersistedData): void {
 function clearStorage(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    cachedRaw = null;
+    cachedData = EMPTY_DATA;
   } catch {
     // Ignore
   }
@@ -168,11 +173,19 @@ function subscribeToStorage(callback: () => void): () => void {
   return () => window.removeEventListener("storage", handler);
 }
 
-const localSnapshot = { current: EMPTY_DATA };
+let cachedRaw: string | null = null;
+let cachedData: PersistedData = EMPTY_DATA;
+
 function getStorageSnapshot(): PersistedData {
-  localSnapshot.current = loadFromStorage();
-  return localSnapshot.current;
+  const raw =
+    typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+  if (raw !== cachedRaw) {
+    cachedRaw = raw;
+    cachedData = raw ? loadFromStorage() : EMPTY_DATA;
+  }
+  return cachedData;
 }
+
 function getServerSnapshot(): PersistedData {
   return EMPTY_DATA;
 }
