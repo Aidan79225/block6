@@ -48,9 +48,10 @@ interface AppState {
   loadReflection: (weekKey: string) => void;
 }
 
-// --- localStorage fallback (for unauthenticated use) ---
+// --- localStorage helpers ---
 
 const STORAGE_KEY = "block6-data";
+const MIGRATED_KEY = "block6-migrated";
 
 interface PersistedData {
   blocks: Block[];
@@ -85,45 +86,179 @@ function saveToStorage(data: PersistedData): void {
   }
 }
 
+function clearStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
+function hasLocalData(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as PersistedData;
+    return (
+      (parsed.blocks?.length ?? 0) > 0 ||
+      Object.keys(parsed.diaryEntries ?? {}).length > 0 ||
+      (parsed.reflection ?? "").length > 0
+    );
+  } catch {
+    return false;
+  }
+}
+
+function wasMigrated(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(MIGRATED_KEY) === "true";
+}
+
+function markMigrated(): void {
+  try {
+    localStorage.setItem(MIGRATED_KEY, "true");
+  } catch {
+    // Ignore
+  }
+}
+
+// --- Migration: push local data to Supabase ---
+
+async function migrateLocalToSupabase(
+  userId: string,
+  data: PersistedData,
+): Promise<void> {
+  for (const block of data.blocks) {
+    try {
+      await upsertBlock(
+        userId,
+        block.weekPlanId,
+        block.dayOfWeek,
+        block.slot,
+        block.blockType,
+        block.title,
+        block.description,
+      );
+    } catch (err) {
+      console.error("[BLOCK6] Migration: failed to save block:", err);
+    }
+  }
+
+  for (const [dateKey, entry] of Object.entries(data.diaryEntries)) {
+    try {
+      await upsertDiary(userId, dateKey, entry.line1, entry.line2, entry.line3);
+    } catch (err) {
+      console.error("[BLOCK6] Migration: failed to save diary:", err);
+    }
+  }
+}
+
+// --- Determine initial state based on auth ---
+
+function getInitialState(): PersistedData {
+  // If user is already logged in (session restored), start empty
+  // so Supabase data gets loaded via loadWeek.
+  // If not logged in, load from localStorage.
+  // We can't check auth synchronously here, so always start from localStorage.
+  // The migration effect will clear it if user is logged in.
+  return loadFromStorage();
+}
+
 // --- Provider ---
 
 const AppStateContext = createContext<AppState | null>(null);
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [blocks, setBlocks] = useState<Block[]>(
-    () => loadFromStorage().blocks,
-  );
+  const [blocks, setBlocks] = useState<Block[]>(() => getInitialState().blocks);
   const [diaryEntries, setDiaryEntries] = useState<Record<string, DiaryLines>>(
-    () => loadFromStorage().diaryEntries,
+    () => getInitialState().diaryEntries,
   );
   const [reflection, setReflectionState] = useState(
-    () => loadFromStorage().reflection,
+    () => getInitialState().reflection,
   );
-  const initialized = useRef(false);
+  const localPersistEnabled = useRef(true);
   const loadedWeeks = useRef<Set<string>>(new Set());
+  const migrating = useRef(false);
+  const lastUserId = useRef<string | null>(null);
 
-  // Persist to localStorage when not logged in
+  // Handle auth state transitions
   useEffect(() => {
-    if (user) return;
-    if (!initialized.current) {
-      initialized.current = true;
-      return;
+    const currentUserId = user?.id ?? null;
+    const previousUserId = lastUserId.current;
+    lastUserId.current = currentUserId;
+
+    if (currentUserId && !previousUserId) {
+      // Just logged in
+      localPersistEnabled.current = false;
+
+      if (!wasMigrated() && hasLocalData()) {
+        // Migrate local data to Supabase
+        migrating.current = true;
+        const localData = loadFromStorage();
+        migrateLocalToSupabase(currentUserId, localData)
+          .then(() => {
+            clearStorage();
+            markMigrated();
+            // Clear in-memory state so loadWeek fetches from Supabase
+            setBlocks([]);
+            setDiaryEntries({});
+            setReflectionState("");
+            loadedWeeks.current.clear();
+          })
+          .catch((err) => {
+            console.error("[BLOCK6] Migration failed:", err);
+          })
+          .finally(() => {
+            migrating.current = false;
+          });
+      } else {
+        // No local data or already migrated — clear state for Supabase
+        Promise.resolve().then(() => {
+          setBlocks([]);
+          setDiaryEntries({});
+          setReflectionState("");
+          loadedWeeks.current.clear();
+        });
+      }
+    } else if (!currentUserId && previousUserId) {
+      // Just logged out — restore from localStorage
+      localPersistEnabled.current = true;
+      Promise.resolve().then(() => {
+        const local = loadFromStorage();
+        setBlocks(local.blocks);
+        setDiaryEntries(local.diaryEntries);
+        setReflectionState(local.reflection);
+        loadedWeeks.current.clear();
+      });
     }
+  }, [user?.id]);
+
+  // Persist to localStorage only when not logged in
+  useEffect(() => {
+    if (!localPersistEnabled.current) return;
     saveToStorage({ blocks, diaryEntries, reflection });
-  }, [blocks, diaryEntries, reflection, user]);
+  }, [blocks, diaryEntries, reflection]);
 
   // Load a week's blocks from Supabase
   const loadWeek = useCallback(
     (weekKey: string) => {
       if (!user || loadedWeeks.current.has(weekKey)) return;
       loadedWeeks.current.add(weekKey);
-      fetchBlocksForWeek(user.id, weekKey).then((fetched) => {
-        setBlocks((prev) => {
-          const withoutThisWeek = prev.filter((b) => b.weekPlanId !== weekKey);
-          return [...withoutThisWeek, ...fetched];
+      fetchBlocksForWeek(user.id, weekKey)
+        .then((fetched) => {
+          setBlocks((prev) => {
+            const withoutThisWeek = prev.filter(
+              (b) => b.weekPlanId !== weekKey,
+            );
+            return [...withoutThisWeek, ...fetched];
+          });
+        })
+        .catch((err) => {
+          console.error("[BLOCK6] Failed to load week:", err);
+          loadedWeeks.current.delete(weekKey);
         });
-      });
     },
     [user],
   );
@@ -168,7 +303,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       description: string,
       blockType: BlockType,
     ) => {
-      // Optimistic local update
       setBlocks((prev) => {
         const existing = prev.find(
           (b) =>
@@ -196,7 +330,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         return [...prev, newBlock];
       });
 
-      // Persist to Supabase if logged in
       if (user) {
         upsertBlock(
           user.id,
@@ -208,7 +341,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           description,
         )
           .then((saved) => {
-            // Sync the server-generated ID back
             setBlocks((prev) =>
               prev.map((b) =>
                 b.weekPlanId === weekKey &&
@@ -220,7 +352,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             );
           })
           .catch((err) => {
-            console.error("[BLOCK6] Failed to save block to Supabase:", err);
+            console.error("[BLOCK6] Failed to save block:", err);
           });
       }
     },
@@ -235,7 +367,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         ),
       );
       if (user) {
-        updateBlockStatus(blockId, status);
+        updateBlockStatus(blockId, status).catch((err) => {
+          console.error("[BLOCK6] Failed to update status:", err);
+        });
       }
     },
     [user],
@@ -248,7 +382,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         [dateKey]: { line1, line2, line3 },
       }));
       if (user) {
-        upsertDiary(user.id, dateKey, line1, line2, line3);
+        upsertDiary(user.id, dateKey, line1, line2, line3).catch((err) => {
+          console.error("[BLOCK6] Failed to save diary:", err);
+        });
       }
     },
     [user],
@@ -261,13 +397,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [diaryEntries],
   );
 
-  const setReflection = useCallback(
-    (text: string) => {
-      setReflectionState(text);
-      // Note: caller should provide weekKey via saveReflection if needed
-    },
-    [],
-  );
+  const setReflection = useCallback((text: string) => {
+    setReflectionState(text);
+  }, []);
 
   return (
     <AppStateContext.Provider
