@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 
@@ -33,14 +40,64 @@ interface AppState {
   setReflection: (text: string) => void;
 }
 
+const STORAGE_KEY = "block6-data";
+
+interface PersistedData {
+  blocks: Block[];
+  diaryEntries: Record<string, DiaryLines>;
+  reflection: string;
+}
+
+function loadFromStorage(): PersistedData {
+  if (typeof window === "undefined") {
+    return { blocks: [], diaryEntries: {}, reflection: "" };
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { blocks: [], diaryEntries: {}, reflection: "" };
+    const parsed = JSON.parse(raw) as PersistedData;
+    const blocks = (parsed.blocks ?? []).map((b) => createBlock(b));
+    return {
+      blocks,
+      diaryEntries: parsed.diaryEntries ?? {},
+      reflection: parsed.reflection ?? "",
+    };
+  } catch {
+    return { blocks: [], diaryEntries: {}, reflection: "" };
+  }
+}
+
+function saveToStorage(data: PersistedData): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Storage full or unavailable
+  }
+}
+
 const AppStateContext = createContext<AppState | null>(null);
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [diaryEntries, setDiaryEntries] = useState<Record<string, DiaryLines>>(
-    {},
+  const [blocks, setBlocks] = useState<Block[]>(
+    () => loadFromStorage().blocks,
   );
-  const [reflection, setReflection] = useState("");
+  const [diaryEntries, setDiaryEntries] = useState<Record<string, DiaryLines>>(
+    () => loadFromStorage().diaryEntries,
+  );
+  const [reflection, setReflectionState] = useState(
+    () => loadFromStorage().reflection,
+  );
+
+  // Track whether initial render is done to avoid persisting on mount
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (!initialized.current) {
+      initialized.current = true;
+      return;
+    }
+    saveToStorage({ blocks, diaryEntries, reflection });
+  }, [blocks, diaryEntries, reflection]);
 
   const saveBlock = useCallback(
     (
@@ -100,6 +157,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     },
     [diaryEntries],
   );
+
+  const setReflection = useCallback((text: string) => {
+    setReflectionState(text);
+  }, []);
 
   return (
     <AppStateContext.Provider
