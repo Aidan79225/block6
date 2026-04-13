@@ -42,12 +42,12 @@ src/
 
 - All colors defined as CSS custom properties (`--color-bg-primary`, `--color-accent`, etc.)
 - Theme switching via `<html data-theme="dark|light">`
-- Dark theme is the primary/default theme
+- Dark theme is the primary/default theme, using GitHub Dark Default palette
 - Theme preference stored in `localStorage`
-- Block type colors:
-  - Core (核心): #4ecca3 (green)
-  - Rest (休息): #ffd369 (yellow)
-  - Buffer (緩衝): #e94560 (red/pink)
+- Block type colors (dark theme):
+  - Core (核心): #3fb950 (green)
+  - Rest (休息): #d29922 (yellow)
+  - Buffer (緩衝): #f85149 (red)
 
 ## DB Tables (3NF)
 
