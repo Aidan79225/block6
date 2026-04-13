@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppStateProvider } from "@/presentation/providers/app-state-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-TW" data-theme="dark" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <AppStateProvider>{children}</AppStateProvider>
+      </body>
     </html>
   );
 }

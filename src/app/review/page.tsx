@@ -1,23 +1,33 @@
 "use client";
-import { useState } from "react";
+
 import Link from "next/link";
 import { CompletionStats } from "@/presentation/components/review/completion-stats";
 import { BlockTypeBreakdown } from "@/presentation/components/review/block-type-breakdown";
 import { ReflectionEditor } from "@/presentation/components/review/reflection-editor";
+import { useAppState } from "@/presentation/providers/app-state-provider";
+import { BlockStatus, BlockType } from "@/domain/entities/block";
 
 export default function ReviewPage() {
-  const [reflection, setReflection] = useState("");
-  // Phase A: static placeholder data
-  const stats = {
-    totalBlocks: 0,
-    completedBlocks: 0,
-    completionRate: 0,
-    byType: {
-      core: { total: 0, completed: 0 },
-      rest: { total: 0, completed: 0 },
-      buffer: { total: 0, completed: 0 },
-    },
+  const { blocks, reflection, setReflection } = useAppState();
+
+  const totalBlocks = blocks.length;
+  const completedBlocks = blocks.filter(
+    (b) => b.status === BlockStatus.Completed,
+  ).length;
+  const completionRate = totalBlocks === 0 ? 0 : completedBlocks / totalBlocks;
+
+  const byType = {
+    core: { total: 0, completed: 0 },
+    rest: { total: 0, completed: 0 },
+    buffer: { total: 0, completed: 0 },
   };
+  for (const block of blocks) {
+    const key = block.blockType as BlockType;
+    byType[key].total++;
+    if (block.status === BlockStatus.Completed) {
+      byType[key].completed++;
+    }
+  }
 
   return (
     <div
@@ -54,11 +64,11 @@ export default function ReviewPage() {
         </Link>
       </div>
       <CompletionStats
-        totalBlocks={stats.totalBlocks}
-        completedBlocks={stats.completedBlocks}
-        completionRate={stats.completionRate}
+        totalBlocks={totalBlocks}
+        completedBlocks={completedBlocks}
+        completionRate={completionRate}
       />
-      <BlockTypeBreakdown byType={stats.byType} />
+      <BlockTypeBreakdown byType={byType} />
       <ReflectionEditor
         reflection={reflection}
         onSave={(text) => setReflection(text)}

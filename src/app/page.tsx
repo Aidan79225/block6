@@ -8,15 +8,12 @@ import { DayView } from "@/presentation/components/day-view/day-view";
 import { WeekOverview } from "@/presentation/components/week-overview/week-overview";
 import { useTheme } from "@/presentation/hooks/use-theme";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
-import { useBlocks } from "@/presentation/hooks/use-blocks";
-import { useDiary } from "@/presentation/hooks/use-diary";
-import type { Block } from "@/domain/entities/block";
+import { useAppState } from "@/presentation/providers/app-state-provider";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
 
 interface SelectedCell {
   dayOfWeek: number;
   slot: number;
-  block: Block | null;
 }
 
 function formatDateKey(weekStart: Date, dayOfWeek: number): string {
@@ -39,18 +36,21 @@ function isTodayInWeek(weekStart: Date, dayOfWeek: number): boolean {
 export default function DashboardPage() {
   const { theme, toggleTheme } = useTheme();
   const { weekStart, goToPreviousWeek, goToNextWeek } = useWeekPlan();
-  const { blocks, saveBlock, updateStatus } = useBlocks();
-  const { saveDiary, getDiary } = useDiary();
+  const { blocks, saveBlock, updateStatus, saveDiary, getDiary } =
+    useAppState();
   const [selected, setSelected] = useState<SelectedCell | null>(null);
   const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
   const [mobileView, setMobileView] = useState<"day" | "overview">("day");
 
-  const handleBlockClick = (
-    dayOfWeek: number,
-    slot: number,
-    block: Block | null,
-  ) => {
-    setSelected({ dayOfWeek, slot, block });
+  const completedCount = blocks.filter(
+    (b) => b.status === BlockStatus.Completed,
+  ).length;
+  const totalCount = blocks.length;
+  const completionPct =
+    totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
+
+  const handleBlockClick = (dayOfWeek: number, slot: number) => {
+    setSelected({ dayOfWeek, slot });
   };
 
   const handleSaveBlock = (
@@ -67,17 +67,15 @@ export default function DashboardPage() {
       description,
       blockType,
     );
-    const updatedBlock = blocks.find(
-      (b) => b.dayOfWeek === selected.dayOfWeek && b.slot === selected.slot,
-    );
-    setSelected((prev) =>
-      prev ? { ...prev, block: updatedBlock ?? prev.block } : null,
-    );
   };
 
   const handleStatusChange = (status: BlockStatus) => {
-    if (!selected?.block) return;
-    updateStatus(selected.block.id, status);
+    if (!selected) return;
+    const block = blocks.find(
+      (b) => b.dayOfWeek === selected.dayOfWeek && b.slot === selected.slot,
+    );
+    if (!block) return;
+    updateStatus(block.id, status);
   };
 
   const handleSaveDiary = (line1: string, line2: string, line3: string) => {
@@ -106,6 +104,12 @@ export default function DashboardPage() {
                 dayOfWeek={mobileDay}
                 blocks={blocks}
                 onBlockClick={handleBlockClick}
+                onPreviousDay={
+                  mobileDay > 1 ? () => setMobileDay((d) => d - 1) : undefined
+                }
+                onNextDay={
+                  mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
+                }
               />
             ) : (
               <WeekOverview
@@ -188,6 +192,48 @@ export default function DashboardPage() {
           />
         )}
       </div>
+      {blocks.length > 0 && (
+        <footer
+          className="desktop-only"
+          style={{
+            padding: "8px 24px",
+            backgroundColor: "var(--color-bg-secondary)",
+            borderTop: "1px solid var(--color-border)",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}
+        >
+          <span
+            style={{
+              color: "var(--color-text-secondary)",
+              fontSize: "13px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            本週完成率 {completionPct}% ({completedCount}/{totalCount})
+          </span>
+          <div
+            style={{
+              flex: 1,
+              background: "var(--color-bg-tertiary)",
+              borderRadius: "var(--radius-sm)",
+              height: "6px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                background: "var(--color-status-completed)",
+                height: "100%",
+                width: `${completionPct}%`,
+                borderRadius: "var(--radius-sm)",
+                transition: "width 0.3s",
+              }}
+            />
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

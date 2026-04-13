@@ -71,6 +71,7 @@ export function SidePanel({
         </button>
       </div>
       <BlockEditor
+        key={`editor-${dayOfWeek}-${slot}`}
         title={block?.title ?? ""}
         description={block?.description ?? ""}
         blockType={block?.blockType ?? BlockType.Core}
@@ -94,6 +95,7 @@ export function SidePanel({
       )}
       {isToday && (
         <DiaryForm
+          key={`diary-${dayOfWeek}`}
           line1={diaryLines?.line1 ?? ""}
           line2={diaryLines?.line2 ?? ""}
           line3={diaryLines?.line3 ?? ""}

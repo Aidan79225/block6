@@ -3,7 +3,7 @@ import { BlockCell } from "./block-cell";
 
 interface WeekGridProps {
   blocks: Block[];
-  onBlockClick: (dayOfWeek: number, slot: number, block: Block | null) => void;
+  onBlockClick: (dayOfWeek: number, slot: number) => void;
 }
 
 const DAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
@@ -45,7 +45,7 @@ export function WeekGrid({ blocks, onBlockClick }: WeekGridProps) {
             <BlockCell
               key={`${dayOfWeek}-${slot}`}
               block={block}
-              onClick={() => onBlockClick(dayOfWeek, slot, block)}
+              onClick={() => onBlockClick(dayOfWeek, slot)}
             />
           );
         }),
