@@ -1,19 +1,36 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { CompletionStats } from "@/presentation/components/review/completion-stats";
 import { BlockTypeBreakdown } from "@/presentation/components/review/block-type-breakdown";
 import { ReflectionEditor } from "@/presentation/components/review/reflection-editor";
 import { useAppState } from "@/presentation/providers/app-state-provider";
+import { useAuth } from "@/presentation/providers/auth-provider";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
 import { BlockStatus, BlockType } from "@/domain/entities/block";
+import {
+  upsertReflection,
+} from "@/infrastructure/supabase/database";
 
 export default function ReviewPage() {
+  const { user } = useAuth();
   const { weekStart } = useWeekPlan();
-  const { getBlocksForWeek, reflection, setReflection } = useAppState();
+  const {
+    getBlocksForWeek,
+    reflection,
+    setReflection,
+    loadWeek,
+    loadReflection,
+  } = useAppState();
 
   const weekKey = weekStart.toISOString().split("T")[0];
   const blocks = getBlocksForWeek(weekKey);
+
+  useEffect(() => {
+    loadWeek(weekKey);
+    loadReflection(weekKey);
+  }, [weekKey, loadWeek, loadReflection]);
 
   const totalBlocks = blocks.length;
   const completedBlocks = blocks.filter(
@@ -33,6 +50,13 @@ export default function ReviewPage() {
       byType[key].completed++;
     }
   }
+
+  const handleSaveReflection = (text: string) => {
+    setReflection(text);
+    if (user) {
+      upsertReflection(user.id, weekKey, text);
+    }
+  };
 
   return (
     <div
@@ -76,7 +100,7 @@ export default function ReviewPage() {
       <BlockTypeBreakdown byType={byType} />
       <ReflectionEditor
         reflection={reflection}
-        onSave={(text) => setReflection(text)}
+        onSave={handleSaveReflection}
       />
     </div>
   );

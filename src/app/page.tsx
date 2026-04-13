@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/presentation/components/header/header";
 import { WeekGrid } from "@/presentation/components/week-grid/week-grid";
 import { SidePanel } from "@/presentation/components/side-panel/side-panel";
@@ -9,6 +9,7 @@ import { WeekOverview } from "@/presentation/components/week-overview/week-overv
 import { useTheme } from "@/presentation/hooks/use-theme";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
 import { useAppState } from "@/presentation/providers/app-state-provider";
+import { useAuth } from "@/presentation/providers/auth-provider";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
 
 interface SelectedCell {
@@ -34,16 +35,39 @@ function isTodayInWeek(weekStart: Date, dayOfWeek: number): boolean {
 }
 
 export default function DashboardPage() {
+  const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { weekStart, goToPreviousWeek, goToNextWeek } = useWeekPlan();
-  const { getBlocksForWeek, saveBlock, updateStatus, saveDiary, getDiary } =
-    useAppState();
+  const {
+    getBlocksForWeek,
+    saveBlock,
+    updateStatus,
+    saveDiary,
+    getDiary,
+    loadWeek,
+    loadDiary,
+  } = useAppState();
+  const [selected, setSelected] = useState<SelectedCell | null>(null);
+  const [mobileDay, setMobileDay] = useState<number>(
+    new Date().getDay() || 7,
+  );
+  const [mobileView, setMobileView] = useState<"day" | "overview">("day");
 
   const weekKey = weekStart.toISOString().split("T")[0];
   const blocks = getBlocksForWeek(weekKey);
-  const [selected, setSelected] = useState<SelectedCell | null>(null);
-  const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
-  const [mobileView, setMobileView] = useState<"day" | "overview">("day");
+
+  // Load data from Supabase when week changes
+  useEffect(() => {
+    loadWeek(weekKey);
+  }, [weekKey, loadWeek]);
+
+  // Load diary when a cell is selected
+  useEffect(() => {
+    if (selected) {
+      const dateKey = formatDateKey(weekStart, selected.dayOfWeek);
+      loadDiary(dateKey);
+    }
+  }, [selected, weekStart, loadDiary]);
 
   const completedCount = blocks.filter(
     (b) => b.status === BlockStatus.Completed,
@@ -92,9 +116,11 @@ export default function DashboardPage() {
       <Header
         weekStart={weekStart}
         theme={theme}
+        userEmail={user?.email ?? null}
         onPreviousWeek={goToPreviousWeek}
         onNextWeek={goToNextWeek}
         onToggleTheme={toggleTheme}
+        onSignOut={signOut}
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
@@ -108,10 +134,14 @@ export default function DashboardPage() {
                 blocks={blocks}
                 onBlockClick={handleBlockClick}
                 onPreviousDay={
-                  mobileDay > 1 ? () => setMobileDay((d) => d - 1) : undefined
+                  mobileDay > 1
+                    ? () => setMobileDay((d) => d - 1)
+                    : undefined
                 }
                 onNextDay={
-                  mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
+                  mobileDay < 7
+                    ? () => setMobileDay((d) => d + 1)
+                    : undefined
                 }
               />
             ) : (

@@ -10,12 +10,16 @@ import {
 } from "react";
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
-
-interface DiaryLines {
-  line1: string;
-  line2: string;
-  line3: string;
-}
+import { useAuth } from "./auth-provider";
+import {
+  fetchBlocksForWeek,
+  upsertBlock,
+  updateBlockStatus,
+  fetchDiary,
+  upsertDiary,
+  fetchReflection,
+} from "@/infrastructure/supabase/database";
+import type { DiaryLines } from "@/infrastructure/supabase/database";
 
 interface AppState {
   allBlocks: Block[];
@@ -39,7 +43,12 @@ interface AppState {
   getDiary: (dateKey: string) => DiaryLines | null;
   reflection: string;
   setReflection: (text: string) => void;
+  loadWeek: (weekKey: string) => void;
+  loadDiary: (dateKey: string) => void;
+  loadReflection: (weekKey: string) => void;
 }
+
+// --- localStorage fallback (for unauthenticated use) ---
 
 const STORAGE_KEY = "block6-data";
 
@@ -76,9 +85,12 @@ function saveToStorage(data: PersistedData): void {
   }
 }
 
+// --- Provider ---
+
 const AppStateContext = createContext<AppState | null>(null);
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [blocks, setBlocks] = useState<Block[]>(
     () => loadFromStorage().blocks,
   );
@@ -88,17 +100,57 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [reflection, setReflectionState] = useState(
     () => loadFromStorage().reflection,
   );
-
-  // Track whether initial render is done to avoid persisting on mount
   const initialized = useRef(false);
+  const loadedWeeks = useRef<Set<string>>(new Set());
 
+  // Persist to localStorage when not logged in
   useEffect(() => {
+    if (user) return;
     if (!initialized.current) {
       initialized.current = true;
       return;
     }
     saveToStorage({ blocks, diaryEntries, reflection });
-  }, [blocks, diaryEntries, reflection]);
+  }, [blocks, diaryEntries, reflection, user]);
+
+  // Load a week's blocks from Supabase
+  const loadWeek = useCallback(
+    (weekKey: string) => {
+      if (!user || loadedWeeks.current.has(weekKey)) return;
+      loadedWeeks.current.add(weekKey);
+      fetchBlocksForWeek(user.id, weekKey).then((fetched) => {
+        setBlocks((prev) => {
+          const withoutThisWeek = prev.filter((b) => b.weekPlanId !== weekKey);
+          return [...withoutThisWeek, ...fetched];
+        });
+      });
+    },
+    [user],
+  );
+
+  // Load diary for a specific date from Supabase
+  const loadDiary = useCallback(
+    (dateKey: string) => {
+      if (!user || diaryEntries[dateKey]) return;
+      fetchDiary(user.id, dateKey).then((entry) => {
+        if (entry) {
+          setDiaryEntries((prev) => ({ ...prev, [dateKey]: entry }));
+        }
+      });
+    },
+    [user, diaryEntries],
+  );
+
+  // Load reflection for a week from Supabase
+  const loadReflection = useCallback(
+    (weekKey: string) => {
+      if (!user) return;
+      fetchReflection(user.id, weekKey).then((text) => {
+        setReflectionState(text);
+      });
+    },
+    [user],
+  );
 
   const getBlocksForWeek = useCallback(
     (weekKey: string): Block[] => {
@@ -116,6 +168,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       description: string,
       blockType: BlockType,
     ) => {
+      // Optimistic local update
       setBlocks((prev) => {
         const existing = prev.find(
           (b) =>
@@ -142,15 +195,47 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         });
         return [...prev, newBlock];
       });
+
+      // Persist to Supabase if logged in
+      if (user) {
+        upsertBlock(
+          user.id,
+          weekKey,
+          dayOfWeek,
+          slot,
+          blockType,
+          title,
+          description,
+        ).then((saved) => {
+          // Sync the server-generated ID back
+          setBlocks((prev) =>
+            prev.map((b) =>
+              b.weekPlanId === weekKey &&
+              b.dayOfWeek === dayOfWeek &&
+              b.slot === slot
+                ? saved
+                : b,
+            ),
+          );
+        });
+      }
     },
-    [],
+    [user],
   );
 
-  const updateStatus = useCallback((blockId: string, status: BlockStatus) => {
-    setBlocks((prev) =>
-      prev.map((b) => (b.id === blockId ? createBlock({ ...b, status }) : b)),
-    );
-  }, []);
+  const updateStatus = useCallback(
+    (blockId: string, status: BlockStatus) => {
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId ? createBlock({ ...b, status }) : b,
+        ),
+      );
+      if (user) {
+        updateBlockStatus(blockId, status);
+      }
+    },
+    [user],
+  );
 
   const saveDiary = useCallback(
     (dateKey: string, line1: string, line2: string, line3: string) => {
@@ -158,8 +243,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         [dateKey]: { line1, line2, line3 },
       }));
+      if (user) {
+        upsertDiary(user.id, dateKey, line1, line2, line3);
+      }
     },
-    [],
+    [user],
   );
 
   const getDiary = useCallback(
@@ -169,9 +257,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [diaryEntries],
   );
 
-  const setReflection = useCallback((text: string) => {
-    setReflectionState(text);
-  }, []);
+  const setReflection = useCallback(
+    (text: string) => {
+      setReflectionState(text);
+      // Note: caller should provide weekKey via saveReflection if needed
+    },
+    [],
+  );
 
   return (
     <AppStateContext.Provider
@@ -185,6 +277,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         getDiary,
         reflection,
         setReflection,
+        loadWeek,
+        loadDiary,
+        loadReflection,
       }}
     >
       {children}

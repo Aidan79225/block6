@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthProvider } from "@/presentation/providers/auth-provider";
 import { AppStateProvider } from "@/presentation/providers/app-state-provider";
 import "./globals.css";
 
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="zh-TW" data-theme="dark" suppressHydrationWarning>
       <body>
-        <AppStateProvider>{children}</AppStateProvider>
+        <AuthProvider>
+          <AppStateProvider>{children}</AppStateProvider>
+        </AuthProvider>
       </body>
     </html>
   );
