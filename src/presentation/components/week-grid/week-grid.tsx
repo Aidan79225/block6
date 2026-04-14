@@ -52,6 +52,8 @@ export function WeekGrid({
             <BlockCell
               key={`${dayOfWeek}-${slot}`}
               block={block}
+              dayOfWeek={dayOfWeek}
+              slot={slot}
               isSelected={
                 selectedDayOfWeek === dayOfWeek && selectedSlot === slot
               }
