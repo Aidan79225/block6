@@ -31,6 +31,7 @@ interface SidePanelProps {
   onStartTimer: () => void;
   onStopTimer: () => void;
   onAddManualTimer: (startedAt: Date, endedAt: Date) => void;
+  onClearTimer: () => void;
   onClose: () => void;
 }
 
@@ -56,6 +57,7 @@ export function SidePanel({
   onStartTimer,
   onStopTimer,
   onAddManualTimer,
+  onClearTimer,
   onClose,
 }: SidePanelProps) {
   return (
@@ -119,6 +121,7 @@ export function SidePanel({
             onStart={onStartTimer}
             onStop={onStopTimer}
             onAddManual={onAddManualTimer}
+            onClear={onClearTimer}
           />
           <div>
             <label

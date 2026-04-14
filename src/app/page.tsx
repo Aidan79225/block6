@@ -56,6 +56,7 @@ export default function DashboardPage() {
     startTimer,
     stopTimer,
     addManualTimer,
+    clearTimer,
   } = useAppState();
   const [selected, setSelected] = useState<SelectedCell | null>(null);
   const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
@@ -259,6 +260,9 @@ export default function DashboardPage() {
             }}
             onAddManualTimer={(s, e) => {
               if (selectedBlock) addManualTimer(selectedBlock.id, s, e);
+            }}
+            onClearTimer={() => {
+              if (selectedBlock) clearTimer(selectedBlock.id);
             }}
             onClose={() => setSelected(null)}
           />

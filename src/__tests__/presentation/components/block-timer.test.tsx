@@ -13,6 +13,7 @@ describe("BlockTimer", () => {
         onStart={() => {}}
         onStop={() => {}}
         onAddManual={() => {}}
+        onClear={() => {}}
       />,
     );
     expect(screen.getByText("01:01:01")).toBeInTheDocument();
@@ -27,6 +28,7 @@ describe("BlockTimer", () => {
         onStart={() => {}}
         onStop={() => {}}
         onAddManual={() => {}}
+        onClear={() => {}}
       />,
     );
     expect(
@@ -43,6 +45,7 @@ describe("BlockTimer", () => {
         onStart={() => {}}
         onStop={() => {}}
         onAddManual={() => {}}
+        onClear={() => {}}
       />,
     );
     expect(
@@ -63,6 +66,7 @@ describe("BlockTimer", () => {
         }}
         onStop={() => {}}
         onAddManual={() => {}}
+        onClear={() => {}}
       />,
     );
     await user.click(screen.getByRole("button", { name: /開始計時/ }));
@@ -79,6 +83,7 @@ describe("BlockTimer", () => {
         onStart={() => {}}
         onStop={() => {}}
         onAddManual={() => {}}
+        onClear={() => {}}
       />,
     );
     await user.click(screen.getByRole("button", { name: /手動新增/ }));

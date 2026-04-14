@@ -32,6 +32,7 @@ import {
   startTimerForBlock,
   stopActiveSession,
   addManualSession as dbAddManualSession,
+  deleteSessionsForBlock as dbDeleteSessionsForBlock,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 
@@ -76,6 +77,7 @@ interface AppState {
     startedAt: Date,
     endedAt: Date,
   ) => Promise<void>;
+  clearTimer: (blockId: string) => Promise<void>;
 }
 
 // --- localStorage helpers ---
@@ -677,6 +679,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, notify],
   );
 
+  const clearTimer = useCallback(
+    async (blockId: string) => {
+      if (!user) return;
+      try {
+        await dbDeleteSessionsForBlock(blockId);
+        setTimerSessions((prev) => prev.filter((s) => s.blockId !== blockId));
+        if (activeTimer?.blockId === blockId) {
+          setActiveTimer(null);
+        }
+      } catch (err) {
+        console.error(err);
+        notify.error("清除計時失敗");
+      }
+    },
+    [user, activeTimer, notify],
+  );
+
   return (
     <AppStateContext.Provider
       value={{
@@ -704,6 +723,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         startTimer,
         stopTimer,
         addManualTimer,
+        clearTimer,
       }}
     >
       {children}

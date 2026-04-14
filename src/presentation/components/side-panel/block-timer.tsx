@@ -9,6 +9,7 @@ interface BlockTimerProps {
   onStart: () => void;
   onStop: () => void;
   onAddManual: (startedAt: Date, endedAt: Date) => void;
+  onClear: () => void;
 }
 
 function formatHMS(total: number): string {
@@ -31,6 +32,7 @@ export function BlockTimer({
   onStart,
   onStop,
   onAddManual,
+  onClear,
 }: BlockTimerProps) {
   const [showManual, setShowManual] = useState(false);
   const [startedAt, setStartedAt] = useState(() =>
@@ -57,6 +59,14 @@ export function BlockTimer({
     }
     onAddManual(s, e);
     setShowManual(false);
+  };
+
+  const handleClearClick = () => {
+    const confirmed = window.confirm(
+      "清除後此區塊所有計時記錄將無法復原，確定嗎？",
+    );
+    if (!confirmed) return;
+    onClear();
   };
 
   return (
@@ -129,20 +139,40 @@ export function BlockTimer({
         )}
       </div>
       {!showManual ? (
-        <button
-          onClick={() => setShowManual(true)}
-          style={{
-            background: "none",
-            border: "1px dashed var(--color-border)",
-            borderRadius: "var(--radius-sm)",
-            color: "var(--color-text-secondary)",
-            padding: "4px 8px",
-            cursor: "pointer",
-            fontSize: "12px",
-          }}
-        >
-          + 手動新增
-        </button>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <button
+            onClick={() => setShowManual(true)}
+            style={{
+              flex: 1,
+              background: "none",
+              border: "1px dashed var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--color-text-secondary)",
+              padding: "4px 8px",
+              cursor: "pointer",
+              fontSize: "12px",
+            }}
+          >
+            + 手動新增
+          </button>
+          <button
+            onClick={handleClearClick}
+            disabled={elapsedSeconds === 0 && !isActive}
+            style={{
+              background: "none",
+              border: "1px dashed var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--color-text-muted)",
+              padding: "4px 8px",
+              cursor:
+                elapsedSeconds === 0 && !isActive ? "not-allowed" : "pointer",
+              fontSize: "12px",
+              opacity: elapsedSeconds === 0 && !isActive ? 0.5 : 1,
+            }}
+          >
+            清除
+          </button>
+        </div>
       ) : (
         <div
           style={{

@@ -509,3 +509,11 @@ export async function addManualSession(
   if (error) throw new Error(error.message);
   return dbTimerSessionToEntity(data as DbTimerSession);
 }
+
+export async function deleteSessionsForBlock(blockId: string): Promise<void> {
+  const { error } = await supabase
+    .from("timer_sessions")
+    .delete()
+    .eq("block_id", blockId);
+  if (error) throw new Error(error.message);
+}
