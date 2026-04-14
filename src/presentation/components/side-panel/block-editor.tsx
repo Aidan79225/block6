@@ -17,6 +17,11 @@ const typeOptions: { value: BlockType; label: string; color: string }[] = [
     label: "緩衝",
     color: "var(--color-block-buffer)",
   },
+  {
+    value: BlockType.General,
+    label: "一般",
+    color: "var(--color-block-general)",
+  },
 ];
 
 export function BlockEditor({
