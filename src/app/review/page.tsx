@@ -38,10 +38,11 @@ export default function ReviewPage() {
   ).length;
   const completionRate = totalBlocks === 0 ? 0 : completedBlocks / totalBlocks;
 
-  const byType = {
-    core: { total: 0, completed: 0 },
-    rest: { total: 0, completed: 0 },
-    buffer: { total: 0, completed: 0 },
+  const byType: Record<BlockType, { total: number; completed: number }> = {
+    [BlockType.Core]: { total: 0, completed: 0 },
+    [BlockType.Rest]: { total: 0, completed: 0 },
+    [BlockType.Buffer]: { total: 0, completed: 0 },
+    [BlockType.General]: { total: 0, completed: 0 },
   };
   for (const block of blocks) {
     const key = block.blockType as BlockType;

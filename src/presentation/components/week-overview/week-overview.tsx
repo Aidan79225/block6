@@ -11,6 +11,7 @@ const typeColorMap: Record<BlockType, string> = {
   [BlockType.Core]: "var(--color-block-core)",
   [BlockType.Rest]: "var(--color-block-rest)",
   [BlockType.Buffer]: "var(--color-block-buffer)",
+  [BlockType.General]: "var(--color-block-general)",
 };
 
 export function WeekOverview({ blocks, onDayClick }: WeekOverviewProps) {

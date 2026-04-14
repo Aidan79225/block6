@@ -2,6 +2,7 @@ export enum BlockType {
   Core = "core",
   Rest = "rest",
   Buffer = "buffer",
+  General = "general",
 }
 export enum BlockStatus {
   Planned = "planned",

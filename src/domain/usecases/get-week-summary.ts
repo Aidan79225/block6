@@ -23,6 +23,7 @@ export class GetWeekSummaryUseCase {
       [BlockType.Core]: { total: 0, completed: 0 },
       [BlockType.Rest]: { total: 0, completed: 0 },
       [BlockType.Buffer]: { total: 0, completed: 0 },
+      [BlockType.General]: { total: 0, completed: 0 },
     };
 
     let completedBlocks = 0;
