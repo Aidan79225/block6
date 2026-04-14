@@ -142,10 +142,10 @@ export default function DashboardPage() {
     updateStatus(selectedBlock.id, status);
   };
 
-  const handleSaveDiary = (line1: string, line2: string, line3: string) => {
+  const handleSaveDiary = (bad: string, good: string, next: string) => {
     if (!selected) return;
     const dateKey = formatDateKey(weekStart, selected.dayOfWeek);
-    saveDiary(dateKey, line1, line2, line3);
+    saveDiary(dateKey, bad, good, next);
   };
 
   return (

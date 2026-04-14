@@ -2,21 +2,34 @@
 import { useState } from "react";
 
 interface DiaryFormProps {
-  line1: string;
-  line2: string;
-  line3: string;
-  onSave: (line1: string, line2: string, line3: string) => void;
+  bad: string;
+  good: string;
+  next: string;
+  onSave: (bad: string, good: string, next: string) => void;
 }
 
+const FIELD_CONFIG: Array<{
+  key: "bad" | "good" | "next";
+  label: string;
+  placeholder: string;
+}> = [
+  { key: "bad", label: "Bad", placeholder: "Bad — 今天哪裡不好..." },
+  { key: "good", label: "Good", placeholder: "Good — 今天哪裡做得好..." },
+  { key: "next", label: "Next", placeholder: "Next — 下一步怎麼調整..." },
+];
+
 export function DiaryForm({
-  line1: initialLine1,
-  line2: initialLine2,
-  line3: initialLine3,
+  bad: initialBad,
+  good: initialGood,
+  next: initialNext,
   onSave,
 }: DiaryFormProps) {
-  const [line1, setLine1] = useState(initialLine1);
-  const [line2, setLine2] = useState(initialLine2);
-  const [line3, setLine3] = useState(initialLine3);
+  const [bad, setBad] = useState(initialBad);
+  const [good, setGood] = useState(initialGood);
+  const [next, setNext] = useState(initialNext);
+
+  const values = { bad, good, next };
+  const setters = { bad: setBad, good: setGood, next: setNext };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -29,50 +42,38 @@ export function DiaryForm({
       >
         情緒日記
       </label>
-      <input
-        type="text"
-        value={line1}
-        onChange={(e) => setLine1(e.target.value)}
-        placeholder="第一行..."
-        style={{
-          background: "var(--color-bg-tertiary)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-sm)",
-          color: "var(--color-text-primary)",
-          padding: "8px",
-          fontSize: "14px",
-        }}
-      />
-      <input
-        type="text"
-        value={line2}
-        onChange={(e) => setLine2(e.target.value)}
-        placeholder="第二行..."
-        style={{
-          background: "var(--color-bg-tertiary)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-sm)",
-          color: "var(--color-text-primary)",
-          padding: "8px",
-          fontSize: "14px",
-        }}
-      />
-      <input
-        type="text"
-        value={line3}
-        onChange={(e) => setLine3(e.target.value)}
-        placeholder="第三行..."
-        style={{
-          background: "var(--color-bg-tertiary)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-sm)",
-          color: "var(--color-text-primary)",
-          padding: "8px",
-          fontSize: "14px",
-        }}
-      />
+      {FIELD_CONFIG.map(({ key, label, placeholder }) => (
+        <div
+          key={key}
+          style={{ display: "flex", flexDirection: "column", gap: "4px" }}
+        >
+          <span
+            style={{
+              color: "var(--color-text-muted)",
+              fontSize: "11px",
+              fontWeight: 600,
+            }}
+          >
+            {label}
+          </span>
+          <input
+            type="text"
+            value={values[key]}
+            onChange={(e) => setters[key](e.target.value)}
+            placeholder={placeholder}
+            style={{
+              background: "var(--color-bg-tertiary)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--color-text-primary)",
+              padding: "8px",
+              fontSize: "14px",
+            }}
+          />
+        </div>
+      ))}
       <button
-        onClick={() => onSave(line1, line2, line3)}
+        onClick={() => onSave(bad, good, next)}
         aria-label="儲存"
         style={{
           background: "var(--color-accent)",

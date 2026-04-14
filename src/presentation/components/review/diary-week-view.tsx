@@ -1,15 +1,21 @@
 interface Entry {
   dayOfWeek: number;
-  line1: string;
-  line2: string;
-  line3: string;
+  bad: string;
+  good: string;
+  next: string;
 }
 
 interface Props {
-  entries: Array<Entry | null>; // length 7, index 0 = Monday
+  entries: Array<Entry | null>;
 }
 
 const DAY_LABELS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"];
+
+const FIELDS: Array<{ key: "bad" | "good" | "next"; label: string }> = [
+  { key: "bad", label: "Bad" },
+  { key: "good", label: "Good" },
+  { key: "next", label: "Next" },
+];
 
 export function DiaryWeekView({ entries }: Props) {
   return (
@@ -33,7 +39,7 @@ export function DiaryWeekView({ entries }: Props) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(7, minmax(110px, 1fr))",
+          gridTemplateColumns: "repeat(7, minmax(130px, 1fr))",
           gap: "8px",
           overflowX: "auto",
         }}
@@ -47,10 +53,10 @@ export function DiaryWeekView({ entries }: Props) {
                 background: "var(--color-bg-tertiary)",
                 borderRadius: "var(--radius-sm)",
                 padding: "8px",
-                minHeight: "100px",
+                minHeight: "120px",
                 display: "flex",
                 flexDirection: "column",
-                gap: "4px",
+                gap: "6px",
               }}
             >
               <span
@@ -63,32 +69,34 @@ export function DiaryWeekView({ entries }: Props) {
                 {label}
               </span>
               {entry ? (
-                <>
-                  <span
+                FIELDS.map(({ key, label: fieldLabel }) => (
+                  <div
+                    key={key}
                     style={{
-                      color: "var(--color-text-primary)",
-                      fontSize: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "2px",
                     }}
                   >
-                    {entry.line1}
-                  </span>
-                  <span
-                    style={{
-                      color: "var(--color-text-primary)",
-                      fontSize: "12px",
-                    }}
-                  >
-                    {entry.line2}
-                  </span>
-                  <span
-                    style={{
-                      color: "var(--color-text-primary)",
-                      fontSize: "12px",
-                    }}
-                  >
-                    {entry.line3}
-                  </span>
-                </>
+                    <span
+                      style={{
+                        color: "var(--color-text-muted)",
+                        fontSize: "10px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {fieldLabel}
+                    </span>
+                    <span
+                      style={{
+                        color: "var(--color-text-primary)",
+                        fontSize: "12px",
+                      }}
+                    >
+                      {entry[key] || "—"}
+                    </span>
+                  </div>
+                ))
               ) : (
                 <span
                   style={{
