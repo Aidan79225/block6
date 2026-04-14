@@ -71,9 +71,9 @@ export default function ReviewPage() {
 
   const weekDiaries: Array<{
     dayOfWeek: number;
-    line1: string;
-    line2: string;
-    line3: string;
+    bad: string;
+    good: string;
+    next: string;
   } | null> = [];
   for (let dow = 1; dow <= 7; dow++) {
     const d = new Date(weekStart);

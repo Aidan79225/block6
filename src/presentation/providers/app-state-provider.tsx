@@ -65,12 +65,7 @@ interface AppState {
   swapBlocks: (idA: string, idB: string) => Promise<void>;
   moveBlock: (id: string, dayOfWeek: number, slot: number) => Promise<void>;
   diaryEntries: Record<string, DiaryLines>;
-  saveDiary: (
-    dateKey: string,
-    line1: string,
-    line2: string,
-    line3: string,
-  ) => void;
+  saveDiary: (dateKey: string, bad: string, good: string, next: string) => void;
   getDiary: (dateKey: string) => DiaryLines | null;
   reflection: string;
   setReflection: (text: string) => void;
@@ -127,16 +122,41 @@ const EMPTY_DATA: PersistedData = {
   reflection: "",
 };
 
+function migrateDiaryEntries(
+  raw: Record<string, Record<string, string>> | undefined,
+): Record<string, DiaryLines> {
+  if (!raw) return {};
+  const result: Record<string, DiaryLines> = {};
+  for (const [date, v] of Object.entries(raw)) {
+    if ("bad" in v || "good" in v || "next" in v) {
+      result[date] = {
+        bad: (v.bad as string) ?? "",
+        good: (v.good as string) ?? "",
+        next: (v.next as string) ?? "",
+      };
+    } else {
+      result[date] = {
+        bad: (v.line1 as string) ?? "",
+        good: (v.line2 as string) ?? "",
+        next: (v.line3 as string) ?? "",
+      };
+    }
+  }
+  return result;
+}
+
 function loadFromStorage(): PersistedData {
   if (typeof window === "undefined") return EMPTY_DATA;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return EMPTY_DATA;
-    const parsed = JSON.parse(raw) as PersistedData;
+    const parsed = JSON.parse(raw) as PersistedData & {
+      diaryEntries?: Record<string, Record<string, string>>;
+    };
     const blocks = (parsed.blocks ?? []).map((b) => createBlock(b));
     return {
       blocks,
-      diaryEntries: parsed.diaryEntries ?? {},
+      diaryEntries: migrateDiaryEntries(parsed.diaryEntries),
       reflection: parsed.reflection ?? "",
     };
   } catch {
@@ -217,7 +237,7 @@ async function migrateLocalToSupabase(
   }
   for (const [dateKey, entry] of Object.entries(data.diaryEntries)) {
     try {
-      await upsertDiary(userId, dateKey, entry.line1, entry.line2, entry.line3);
+      await upsertDiary(userId, dateKey, entry.bad, entry.good, entry.next);
     } catch (err) {
       console.error("[BLOCK6] Migration: failed to save diary:", err);
     }
@@ -599,19 +619,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const saveDiary = useCallback(
-    (dateKey: string, line1: string, line2: string, line3: string) => {
+    (dateKey: string, bad: string, good: string, next: string) => {
       if (user) {
         setSupaDiary((prev) => ({
           ...prev,
-          [dateKey]: { line1, line2, line3 },
+          [dateKey]: { bad, good, next },
         }));
-        upsertDiary(user.id, dateKey, line1, line2, line3).catch((err) => {
+        upsertDiary(user.id, dateKey, bad, good, next).catch((err) => {
           console.error(err);
           notify.error("日記儲存失敗");
         });
       } else {
         const current = loadFromStorage();
-        current.diaryEntries[dateKey] = { line1, line2, line3 };
+        current.diaryEntries[dateKey] = { bad, good, next };
         saveToStorage(current);
       }
     },

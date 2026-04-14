@@ -4,28 +4,28 @@ import { DiaryRepository } from "@/domain/repositories/diary-repository";
 export interface WriteDiaryInput {
   userId: string;
   entryDate: Date;
-  line1: string;
-  line2: string;
-  line3: string;
+  bad: string;
+  good: string;
+  next: string;
 }
 
 export class WriteDiaryUseCase {
-  constructor(private readonly repo: DiaryRepository) {}
+  constructor(private readonly diaryRepo: DiaryRepository) {}
 
   async execute(input: WriteDiaryInput): Promise<DiaryEntry> {
-    const existing = await this.repo.findByUserAndDate(
+    const existing = await this.diaryRepo.findByUserAndDate(
       input.userId,
       input.entryDate,
     );
 
     if (existing) {
-      const updated: DiaryEntry = {
+      const updated = createDiaryEntry({
         ...existing,
-        line1: input.line1,
-        line2: input.line2,
-        line3: input.line3,
-      };
-      await this.repo.update(updated);
+        bad: input.bad,
+        good: input.good,
+        next: input.next,
+      });
+      await this.diaryRepo.update(updated);
       return updated;
     }
 
@@ -33,13 +33,13 @@ export class WriteDiaryUseCase {
       id: crypto.randomUUID(),
       userId: input.userId,
       entryDate: input.entryDate,
-      line1: input.line1,
-      line2: input.line2,
-      line3: input.line3,
+      bad: input.bad,
+      good: input.good,
+      next: input.next,
       createdAt: new Date(),
     });
 
-    await this.repo.save(entry);
+    await this.diaryRepo.save(entry);
     return entry;
   }
 }

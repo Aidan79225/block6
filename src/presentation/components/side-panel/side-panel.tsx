@@ -11,7 +11,7 @@ interface SidePanelProps {
   dayOfWeek: number;
   slot: number;
   block: Block | null;
-  diaryLines: { line1: string; line2: string; line3: string } | null;
+  diaryLines: { bad: string; good: string; next: string } | null;
   isToday: boolean;
   subtasks: Subtask[];
   elapsedSeconds: number;
@@ -23,7 +23,7 @@ interface SidePanelProps {
     blockType: BlockType,
   ) => void;
   onStatusChange: (status: BlockStatus) => void;
-  onSaveDiary: (line1: string, line2: string, line3: string) => void;
+  onSaveDiary: (bad: string, good: string, next: string) => void;
   onAddSubtask: (title: string) => void;
   onEditSubtask: (id: string, title: string) => void;
   onToggleSubtask: (id: string) => void;
@@ -145,9 +145,9 @@ export function SidePanel({
       {isToday && (
         <DiaryForm
           key={`diary-${dayOfWeek}`}
-          line1={diaryLines?.line1 ?? ""}
-          line2={diaryLines?.line2 ?? ""}
-          line3={diaryLines?.line3 ?? ""}
+          bad={diaryLines?.bad ?? ""}
+          good={diaryLines?.good ?? ""}
+          next={diaryLines?.next ?? ""}
           onSave={onSaveDiary}
         />
       )}

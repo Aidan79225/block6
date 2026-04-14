@@ -192,15 +192,15 @@ export async function updateBlockStatus(
 interface DbDiary {
   id: string;
   entry_date: string;
-  line_1: string;
-  line_2: string;
-  line_3: string;
+  bad: string;
+  good: string;
+  next: string;
 }
 
 export interface DiaryLines {
-  line1: string;
-  line2: string;
-  line3: string;
+  bad: string;
+  good: string;
+  next: string;
 }
 
 export async function fetchDiary(
@@ -209,22 +209,22 @@ export async function fetchDiary(
 ): Promise<DiaryLines | null> {
   const { data } = await supabase
     .from("diary_entries")
-    .select("line_1, line_2, line_3")
+    .select("bad, good, next")
     .eq("user_id", userId)
     .eq("entry_date", dateKey)
     .maybeSingle();
 
   if (!data) return null;
   const d = data as DbDiary;
-  return { line1: d.line_1, line2: d.line_2, line3: d.line_3 };
+  return { bad: d.bad, good: d.good, next: d.next };
 }
 
 export async function upsertDiary(
   userId: string,
   dateKey: string,
-  line1: string,
-  line2: string,
-  line3: string,
+  bad: string,
+  good: string,
+  next: string,
 ): Promise<void> {
   const { data: existing } = await supabase
     .from("diary_entries")
@@ -236,16 +236,16 @@ export async function upsertDiary(
   if (existing) {
     const { error } = await supabase
       .from("diary_entries")
-      .update({ line_1: line1, line_2: line2, line_3: line3 })
+      .update({ bad, good, next })
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await supabase.from("diary_entries").insert({
       user_id: userId,
       entry_date: dateKey,
-      line_1: line1,
-      line_2: line2,
-      line_3: line3,
+      bad,
+      good,
+      next,
     });
     if (error) throw new Error(error.message);
   }

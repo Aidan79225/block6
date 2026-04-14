@@ -10,15 +10,15 @@ describe("DiaryWeekView", () => {
     expect(screen.getByText("週日")).toBeInTheDocument();
   });
 
-  it("renders diary lines for filled entries", () => {
+  it("renders diary content for filled entries with Bad/Good/Next labels", () => {
     render(
       <DiaryWeekView
         entries={[
           {
             dayOfWeek: 1,
-            line1: "今天很專注",
-            line2: "完成 API",
-            line3: "明天加油",
+            bad: "分心了",
+            good: "完成 API",
+            next: "明天早點",
           },
           null,
           null,
@@ -29,8 +29,8 @@ describe("DiaryWeekView", () => {
         ]}
       />,
     );
-    expect(screen.getByText("今天很專注")).toBeInTheDocument();
+    expect(screen.getByText("分心了")).toBeInTheDocument();
     expect(screen.getByText("完成 API")).toBeInTheDocument();
-    expect(screen.getByText("明天加油")).toBeInTheDocument();
+    expect(screen.getByText("明天早點")).toBeInTheDocument();
   });
 });
