@@ -12,6 +12,7 @@ import {
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import { useAuth } from "./auth-provider";
+import { useNotify } from "./notification-provider";
 import {
   fetchBlocksForWeek,
   upsertBlock,
@@ -196,6 +197,7 @@ const AppStateContext = createContext<AppState | null>(null);
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
+  const notify = useNotify();
 
   // SSR-safe read of localStorage
   const localData = useSyncExternalStore(
@@ -233,10 +235,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           loadedWeeks.current.clear();
         })
         .catch((err) => {
-          console.error("[BLOCK6] Migration failed:", err);
+          console.error(err);
+          notify.error("資料遷移失敗，請重試");
         });
     }
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, notify]);
 
   // Load a week's blocks from Supabase
   const loadWeek = useCallback(
@@ -253,11 +256,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           });
         })
         .catch((err) => {
-          console.error("[BLOCK6] Failed to load week:", err);
+          console.error(err);
+          notify.error("載入週資料失敗");
           loadedWeeks.current.delete(weekKey);
         });
     },
-    [user],
+    [user, notify],
   );
 
   const loadDiary = useCallback(
@@ -354,7 +358,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             );
           })
           .catch((err) => {
-            console.error("[BLOCK6] Failed to save block:", err);
+            console.error(err);
+            notify.error("區塊儲存失敗");
           });
       } else {
         // Local mode: update localStorage directly
@@ -383,7 +388,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveToStorage(current);
       }
     },
-    [user],
+    [user, notify],
   );
 
   const updateStatus = useCallback(
@@ -395,7 +400,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           ),
         );
         updateBlockStatus(blockId, status).catch((err) => {
-          console.error("[BLOCK6] Failed to update status:", err);
+          console.error(err);
+          notify.error("狀態更新失敗");
         });
       } else {
         const current = loadFromStorage();
@@ -405,7 +411,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveToStorage(current);
       }
     },
-    [user],
+    [user, notify],
   );
 
   const saveDiary = useCallback(
@@ -416,7 +422,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           [dateKey]: { line1, line2, line3 },
         }));
         upsertDiary(user.id, dateKey, line1, line2, line3).catch((err) => {
-          console.error("[BLOCK6] Failed to save diary:", err);
+          console.error(err);
+          notify.error("日記儲存失敗");
         });
       } else {
         const current = loadFromStorage();
@@ -424,7 +431,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveToStorage(current);
       }
     },
-    [user],
+    [user, notify],
   );
 
   const getDiary = useCallback(

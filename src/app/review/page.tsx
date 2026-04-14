@@ -12,9 +12,11 @@ import { BlockStatus, BlockType } from "@/domain/entities/block";
 import {
   upsertReflection,
 } from "@/infrastructure/supabase/database";
+import { useNotify } from "@/presentation/providers/notification-provider";
 
 export default function ReviewPage() {
   const { user } = useAuth();
+  const notify = useNotify();
   const { weekStart } = useWeekPlan();
   const {
     getBlocksForWeek,
@@ -54,7 +56,10 @@ export default function ReviewPage() {
   const handleSaveReflection = (text: string) => {
     setReflection(text);
     if (user) {
-      upsertReflection(user.id, weekKey, text);
+      upsertReflection(user.id, weekKey, text).catch((err) => {
+        console.error(err);
+        notify.error("反思儲存失敗");
+      });
     }
   };
 
