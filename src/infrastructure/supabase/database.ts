@@ -530,3 +530,25 @@ export async function deleteSessionsForBlock(blockId: string): Promise<void> {
     .eq("block_id", blockId);
   if (error) throw new Error(error.message);
 }
+
+// --- Block position operations ---
+
+export async function swapBlocksInDb(idA: string, idB: string): Promise<void> {
+  const { error } = await supabase.rpc("swap_blocks", {
+    block_a: idA,
+    block_b: idB,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function moveBlockInDb(
+  id: string,
+  dayOfWeek: number,
+  slot: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from("blocks")
+    .update({ day_of_week: dayOfWeek, slot })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}

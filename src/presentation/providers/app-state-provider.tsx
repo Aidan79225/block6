@@ -36,6 +36,8 @@ import {
   stopActiveSession,
   addManualSession as dbAddManualSession,
   deleteSessionsForBlock as dbDeleteSessionsForBlock,
+  swapBlocksInDb,
+  moveBlockInDb,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 
@@ -51,6 +53,8 @@ interface AppState {
     blockType: BlockType,
   ) => void;
   updateStatus: (blockId: string, status: BlockStatus) => void;
+  swapBlocks: (idA: string, idB: string) => Promise<void>;
+  moveBlock: (id: string, dayOfWeek: number, slot: number) => Promise<void>;
   diaryEntries: Record<string, DiaryLines>;
   saveDiary: (
     dateKey: string,
@@ -492,6 +496,61 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, notify],
   );
 
+  const swapBlocks = useCallback(
+    async (idA: string, idB: string) => {
+      setSupaBlocks((prev) => {
+        const a = prev.find((b) => b.id === idA);
+        const b = prev.find((b) => b.id === idB);
+        if (!a || !b) return prev;
+        return prev.map((block) => {
+          if (block.id === idA) {
+            return createBlock({
+              ...block,
+              dayOfWeek: b.dayOfWeek,
+              slot: b.slot,
+            });
+          }
+          if (block.id === idB) {
+            return createBlock({
+              ...block,
+              dayOfWeek: a.dayOfWeek,
+              slot: a.slot,
+            });
+          }
+          return block;
+        });
+      });
+      if (user) {
+        try {
+          await swapBlocksInDb(idA, idB);
+        } catch (err) {
+          console.error(err);
+          notify.error("區塊交換失敗");
+        }
+      }
+    },
+    [user, notify],
+  );
+
+  const moveBlock = useCallback(
+    async (id: string, dayOfWeek: number, slot: number) => {
+      setSupaBlocks((prev) =>
+        prev.map((block) =>
+          block.id === id ? createBlock({ ...block, dayOfWeek, slot }) : block,
+        ),
+      );
+      if (user) {
+        try {
+          await moveBlockInDb(id, dayOfWeek, slot);
+        } catch (err) {
+          console.error(err);
+          notify.error("區塊移動失敗");
+        }
+      }
+    },
+    [user, notify],
+  );
+
   const saveDiary = useCallback(
     (dateKey: string, line1: string, line2: string, line3: string) => {
       if (user) {
@@ -735,6 +794,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         getBlocksForWeek,
         saveBlock,
         updateStatus,
+        swapBlocks,
+        moveBlock,
         diaryEntries,
         saveDiary,
         getDiary,

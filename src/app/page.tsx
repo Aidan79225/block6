@@ -52,6 +52,8 @@ export default function DashboardPage() {
     toggleSubtask,
     deleteSubtask,
     reorderSubtasks,
+    swapBlocks,
+    moveBlock,
     activeTimer,
     getElapsedSeconds,
     startTimer,
@@ -148,6 +150,8 @@ export default function DashboardPage() {
               selectedDayOfWeek={selected?.dayOfWeek ?? null}
               selectedSlot={selected?.slot ?? null}
               onBlockClick={handleBlockClick}
+              onSwapBlocks={swapBlocks}
+              onMoveBlock={moveBlock}
             />
           </div>
           <div className="mobile-only">

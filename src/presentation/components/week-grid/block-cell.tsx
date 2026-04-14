@@ -1,14 +1,16 @@
+"use client";
+
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 interface BlockCellProps {
   block: Block | null;
+  dayOfWeek: number;
+  slot: number;
   isSelected?: boolean;
   onClick: () => void;
 }
-
-const SELECTED_OUTLINE = "2px solid var(--color-accent)";
-const SELECTED_OUTLINE_OFFSET = "1px";
 
 const typeColorMap: Record<BlockType, string> = {
   [BlockType.Core]: "var(--color-block-core)",
@@ -24,10 +26,47 @@ const statusIcon: Record<BlockStatus, string> = {
   [BlockStatus.Skipped]: "\u2013",
 };
 
-export function BlockCell({ block, isSelected, onClick }: BlockCellProps) {
+const SELECTED_OUTLINE = "2px solid var(--color-accent)";
+const HOVER_OUTLINE = "2px dashed var(--color-accent)";
+const OUTLINE_OFFSET = "1px";
+
+export function BlockCell({
+  block,
+  dayOfWeek,
+  slot,
+  isSelected,
+  onClick,
+}: BlockCellProps) {
+  const droppableId = `slot-${dayOfWeek}-${slot}`;
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: droppableId });
+
+  const draggableId = block ? `block-${block.id}` : `empty-${droppableId}`;
+  const {
+    setNodeRef: setDragRef,
+    listeners,
+    attributes,
+    isDragging,
+    transform,
+  } = useDraggable({
+    id: draggableId,
+    disabled: !block,
+  });
+
+  const outline = isOver
+    ? HOVER_OUTLINE
+    : isSelected
+      ? SELECTED_OUTLINE
+      : "none";
+
+  const combinedRef = (node: HTMLButtonElement | null) => {
+    setDropRef(node);
+    setDragRef(node);
+  };
+
   if (!block) {
     return (
       <button
+        ref={setDropRef}
         onClick={onClick}
         style={{
           background: "var(--color-bg-tertiary)",
@@ -41,8 +80,8 @@ export function BlockCell({ block, isSelected, onClick }: BlockCellProps) {
           alignItems: "center",
           justifyContent: "center",
           fontSize: "18px",
-          outline: isSelected ? SELECTED_OUTLINE : "none",
-          outlineOffset: isSelected ? SELECTED_OUTLINE_OFFSET : "0",
+          outline,
+          outlineOffset: outline === "none" ? "0" : OUTLINE_OFFSET,
         }}
       >
         +
@@ -55,7 +94,10 @@ export function BlockCell({ block, isSelected, onClick }: BlockCellProps) {
 
   return (
     <button
+      ref={combinedRef}
       onClick={onClick}
+      {...listeners}
+      {...attributes}
       style={{
         background: "var(--color-bg-secondary)",
         borderLeft: `3px solid ${borderColor}`,
@@ -72,9 +114,13 @@ export function BlockCell({ block, isSelected, onClick }: BlockCellProps) {
         justifyContent: "space-between",
         textAlign: "left",
         fontSize: "12px",
-        opacity: block.status === BlockStatus.Skipped ? 0.5 : 1,
-        outline: isSelected ? SELECTED_OUTLINE : "none",
-        outlineOffset: isSelected ? SELECTED_OUTLINE_OFFSET : "0",
+        opacity: isDragging || block.status === BlockStatus.Skipped ? 0.4 : 1,
+        outline,
+        outlineOffset: outline === "none" ? "0" : OUTLINE_OFFSET,
+        transform: transform
+          ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+          : undefined,
+        touchAction: "none",
       }}
     >
       <span style={{ fontWeight: 500, fontSize: "11px" }}>{block.title}</span>
