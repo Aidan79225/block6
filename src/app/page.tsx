@@ -48,6 +48,7 @@ export default function DashboardPage() {
     loadDiary,
     getSubtasksForBlock,
     addSubtask,
+    editSubtask,
     toggleSubtask,
     deleteSubtask,
     reorderSubtasks,
@@ -247,6 +248,7 @@ export default function DashboardPage() {
             onAddSubtask={(title) => {
               if (selectedBlock) addSubtask(selectedBlock.id, title);
             }}
+            onEditSubtask={editSubtask}
             onToggleSubtask={toggleSubtask}
             onDeleteSubtask={deleteSubtask}
             onReorderSubtasks={(orderedIds) => {

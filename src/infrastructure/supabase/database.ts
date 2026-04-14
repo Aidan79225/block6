@@ -349,6 +349,17 @@ export async function addSubtask(
   return dbSubtaskToEntity(data as DbSubtask);
 }
 
+export async function updateSubtaskTitle(
+  id: string,
+  title: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("subtasks")
+    .update({ title })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function toggleSubtaskCompleted(
   id: string,
   completed: boolean,

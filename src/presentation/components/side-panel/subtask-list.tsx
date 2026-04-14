@@ -22,6 +22,7 @@ interface SubtaskListProps {
   blockId: string;
   items: Subtask[];
   onAdd: (title: string) => void;
+  onEdit: (id: string, title: string) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
@@ -29,19 +30,42 @@ interface SubtaskListProps {
 
 function SortableItem({
   subtask,
+  onEdit,
   onToggle,
   onDelete,
 }: {
   subtask: Subtask;
+  onEdit: (id: string, title: string) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: subtask.id });
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(subtask.title);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+  };
+
+  const startEdit = () => {
+    setDraft(subtask.title);
+    setIsEditing(true);
+  };
+
+  const commitEdit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== subtask.title) {
+      onEdit(subtask.id, trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const cancelEdit = () => {
+    setDraft(subtask.title);
+    setIsEditing(false);
   };
 
   return (
@@ -78,16 +102,46 @@ function SortableItem({
         onChange={() => onToggle(subtask.id)}
         style={{ cursor: "pointer" }}
       />
-      <span
-        style={{
-          flex: 1,
-          color: "var(--color-text-primary)",
-          fontSize: "13px",
-          textDecoration: subtask.completed ? "line-through" : "none",
-        }}
-      >
-        {subtask.title}
-      </span>
+      {isEditing ? (
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitEdit();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              cancelEdit();
+            }
+          }}
+          autoFocus
+          style={{
+            flex: 1,
+            background: "var(--color-bg-secondary)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--color-text-primary)",
+            padding: "2px 6px",
+            fontSize: "13px",
+          }}
+        />
+      ) : (
+        <span
+          onClick={startEdit}
+          style={{
+            flex: 1,
+            color: "var(--color-text-primary)",
+            fontSize: "13px",
+            textDecoration: subtask.completed ? "line-through" : "none",
+            cursor: "text",
+          }}
+        >
+          {subtask.title}
+        </span>
+      )}
       <button
         onClick={() => onDelete(subtask.id)}
         aria-label="delete"
@@ -108,6 +162,7 @@ function SortableItem({
 export function SubtaskList({
   items,
   onAdd,
+  onEdit,
   onToggle,
   onDelete,
   onReorder,
@@ -155,6 +210,7 @@ export function SubtaskList({
             <SortableItem
               key={subtask.id}
               subtask={subtask}
+              onEdit={onEdit}
               onToggle={onToggle}
               onDelete={onDelete}
             />

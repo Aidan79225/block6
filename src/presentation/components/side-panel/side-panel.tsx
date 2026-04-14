@@ -25,6 +25,7 @@ interface SidePanelProps {
   onStatusChange: (status: BlockStatus) => void;
   onSaveDiary: (line1: string, line2: string, line3: string) => void;
   onAddSubtask: (title: string) => void;
+  onEditSubtask: (id: string, title: string) => void;
   onToggleSubtask: (id: string) => void;
   onDeleteSubtask: (id: string) => void;
   onReorderSubtasks: (orderedIds: string[]) => void;
@@ -51,6 +52,7 @@ export function SidePanel({
   onStatusChange,
   onSaveDiary,
   onAddSubtask,
+  onEditSubtask,
   onToggleSubtask,
   onDeleteSubtask,
   onReorderSubtasks,
@@ -110,6 +112,7 @@ export function SidePanel({
             blockId={block.id}
             items={subtasks}
             onAdd={onAddSubtask}
+            onEdit={onEditSubtask}
             onToggle={onToggleSubtask}
             onDelete={onDeleteSubtask}
             onReorder={onReorderSubtasks}

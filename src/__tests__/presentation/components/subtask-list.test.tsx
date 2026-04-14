@@ -27,6 +27,7 @@ describe("SubtaskList", () => {
         blockId="b-1"
         items={items}
         onAdd={() => {}}
+        onEdit={() => {}}
         onToggle={() => {}}
         onDelete={() => {}}
         onReorder={() => {}}
@@ -46,6 +47,7 @@ describe("SubtaskList", () => {
         onAdd={(title) => {
           added = title;
         }}
+        onEdit={() => {}}
         onToggle={() => {}}
         onDelete={() => {}}
         onReorder={() => {}}
@@ -64,6 +66,7 @@ describe("SubtaskList", () => {
         blockId="b-1"
         items={[makeSubtask({ id: "s-1", title: "寫測試" })]}
         onAdd={() => {}}
+        onEdit={() => {}}
         onToggle={(id) => {
           toggled = id;
         }}
@@ -83,6 +86,7 @@ describe("SubtaskList", () => {
         blockId="b-1"
         items={[makeSubtask({ id: "s-1", title: "寫測試" })]}
         onAdd={() => {}}
+        onEdit={() => {}}
         onToggle={() => {}}
         onDelete={(id) => {
           deleted = id;
@@ -103,6 +107,7 @@ describe("SubtaskList", () => {
         blockId="b-1"
         items={items}
         onAdd={() => {}}
+        onEdit={() => {}}
         onToggle={() => {}}
         onDelete={() => {}}
         onReorder={() => {}}

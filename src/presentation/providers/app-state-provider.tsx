@@ -24,6 +24,7 @@ import {
   fetchReflection,
   fetchSubtasksForBlocks,
   addSubtask as dbAddSubtask,
+  updateSubtaskTitle as dbUpdateSubtaskTitle,
   toggleSubtaskCompleted as dbToggleSubtask,
   deleteSubtask as dbDeleteSubtask,
   reorderSubtasks as dbReorderSubtasks,
@@ -64,6 +65,7 @@ interface AppState {
   subtasks: Subtask[];
   getSubtasksForBlock: (blockId: string) => Subtask[];
   addSubtask: (blockId: string, title: string) => void;
+  editSubtask: (id: string, title: string) => void;
   toggleSubtask: (id: string) => void;
   deleteSubtask: (id: string) => void;
   reorderSubtasks: (blockId: string, orderedIds: string[]) => void;
@@ -542,6 +544,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, subtasks, notify],
   );
 
+  const editSubtask = useCallback(
+    (id: string, title: string) => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, title: trimmed } : s)),
+      );
+      dbUpdateSubtaskTitle(id, trimmed).catch((err) => {
+        console.error(err);
+        notify.error("細項更新失敗");
+      });
+    },
+    [notify],
+  );
+
   const toggleSubtask = useCallback(
     (id: string) => {
       const target = subtasks.find((s) => s.id === id);
@@ -714,6 +731,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         subtasks,
         getSubtasksForBlock,
         addSubtask,
+        editSubtask,
         toggleSubtask,
         deleteSubtask,
         reorderSubtasks,
