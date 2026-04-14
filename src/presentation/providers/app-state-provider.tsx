@@ -269,6 +269,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Supabase-sourced state (only used when logged in)
   const [supaBlocks, setSupaBlocks] = useState<Block[]>([]);
   const [supaDiary, setSupaDiary] = useState<Record<string, DiaryLines>>({});
+  const supaDiaryRef = useRef(supaDiary);
+  useEffect(() => {
+    supaDiaryRef.current = supaDiary;
+  }, [supaDiary]);
   const [supaReflection, setSupaReflection] = useState("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [timerSessions, setTimerSessions] = useState<TimerSession[]>([]);
@@ -385,16 +389,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, notify],
   );
 
+  const triedDiaryDates = useRef<Set<string>>(new Set());
   const loadDiary = useCallback(
     (dateKey: string) => {
-      if (!user || supaDiary[dateKey]) return;
+      if (!user) return;
+      if (supaDiaryRef.current[dateKey]) return;
+      if (triedDiaryDates.current.has(`${user.id}:${dateKey}`)) return;
+      triedDiaryDates.current.add(`${user.id}:${dateKey}`);
       fetchDiary(user.id, dateKey).then((entry) => {
         if (entry) {
           setSupaDiary((prev) => ({ ...prev, [dateKey]: entry }));
         }
       });
     },
-    [user, supaDiary],
+    [user],
   );
 
   const loadReflection = useCallback(
