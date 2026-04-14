@@ -16,9 +16,7 @@ export interface CreateWeeklyTaskInput {
   createdAt: Date;
 }
 
-export function createWeeklyTask(
-  input: CreateWeeklyTaskInput,
-): WeeklyTask {
+export function createWeeklyTask(input: CreateWeeklyTaskInput): WeeklyTask {
   if (!input.title.trim()) {
     throw new Error("WeeklyTask title is required");
   }

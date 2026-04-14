@@ -837,9 +837,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           ? Math.max(0, session.durationSeconds ?? 0)
           : Math.max(
               0,
-              Math.floor(
-                (now.getTime() - session.startedAt.getTime()) / 1000,
-              ),
+              Math.floor((now.getTime() - session.startedAt.getTime()) / 1000),
             );
         totals.set(title, (totals.get(title) ?? 0) + seconds);
       }

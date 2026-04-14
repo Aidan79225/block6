@@ -626,9 +626,7 @@ export async function setWeeklyTaskActive(
   if (error) throw new Error(error.message);
 }
 
-export async function reorderWeeklyTasks(
-  orderedIds: string[],
-): Promise<void> {
+export async function reorderWeeklyTasks(orderedIds: string[]): Promise<void> {
   const OFFSET = 10000;
   for (let i = 0; i < orderedIds.length; i++) {
     const { error } = await supabase
