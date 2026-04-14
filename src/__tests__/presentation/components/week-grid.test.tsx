@@ -4,7 +4,7 @@ import { WeekGrid } from "@/presentation/components/week-grid/week-grid";
 
 describe("WeekGrid", () => {
   it("renders 7 day columns with labels", () => {
-    render(<WeekGrid blocks={[]} onBlockClick={() => {}} />);
+    render(<WeekGrid blocks={[]} onBlockClick={() => {}} onSwapBlocks={() => {}} onMoveBlock={() => {}} />);
     expect(screen.getByText("一")).toBeInTheDocument();
     expect(screen.getByText("二")).toBeInTheDocument();
     expect(screen.getByText("三")).toBeInTheDocument();
@@ -15,7 +15,7 @@ describe("WeekGrid", () => {
   });
 
   it("renders 42 cells (7 days x 6 slots)", () => {
-    render(<WeekGrid blocks={[]} onBlockClick={() => {}} />);
+    render(<WeekGrid blocks={[]} onBlockClick={() => {}} onSwapBlocks={() => {}} onMoveBlock={() => {}} />);
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(42);
   });
