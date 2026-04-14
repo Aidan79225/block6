@@ -3,6 +3,8 @@ import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import type { Subtask } from "@/domain/entities/subtask";
 import { createSubtask } from "@/domain/entities/subtask";
+import type { WeeklyTask } from "@/domain/entities/weekly-task";
+import { createWeeklyTask } from "@/domain/entities/weekly-task";
 import type { TimerSession } from "@/domain/entities/timer-session";
 import { createTimerSession } from "@/domain/entities/timer-session";
 
@@ -550,5 +552,141 @@ export async function moveBlockInDb(
     .from("blocks")
     .update({ day_of_week: dayOfWeek, slot })
     .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// --- Weekly Tasks ---
+
+interface DbWeeklyTask {
+  id: string;
+  user_id: string;
+  title: string;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+function dbWeeklyTaskToEntity(db: DbWeeklyTask): WeeklyTask {
+  return createWeeklyTask({
+    id: db.id,
+    userId: db.user_id,
+    title: db.title,
+    position: db.position,
+    isActive: db.is_active,
+    createdAt: new Date(db.created_at),
+  });
+}
+
+export async function fetchActiveWeeklyTasks(
+  userId: string,
+): Promise<WeeklyTask[]> {
+  const { data, error } = await supabase
+    .from("weekly_tasks")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("position", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as DbWeeklyTask[]).map(dbWeeklyTaskToEntity);
+}
+
+export async function addWeeklyTask(
+  userId: string,
+  title: string,
+  position: number,
+): Promise<WeeklyTask> {
+  const { data, error } = await supabase
+    .from("weekly_tasks")
+    .insert({ user_id: userId, title, position, is_active: true })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return dbWeeklyTaskToEntity(data as DbWeeklyTask);
+}
+
+export async function updateWeeklyTaskTitle(
+  id: string,
+  title: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("weekly_tasks")
+    .update({ title })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function setWeeklyTaskActive(
+  id: string,
+  isActive: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from("weekly_tasks")
+    .update({ is_active: isActive })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function reorderWeeklyTasks(
+  orderedIds: string[],
+): Promise<void> {
+  const OFFSET = 10000;
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("weekly_tasks")
+      .update({ position: OFFSET + i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("weekly_tasks")
+      .update({ position: i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
+}
+
+// --- Weekly task completions ---
+
+interface DbWeeklyTaskCompletion {
+  weekly_task_id: string;
+  week_start: string;
+}
+
+export async function fetchWeeklyTaskCompletions(
+  userId: string,
+  weekStart: string,
+): Promise<{ weeklyTaskId: string; weekStart: string }[]> {
+  const { data, error } = await supabase
+    .from("weekly_task_completions")
+    .select("weekly_task_id, week_start, weekly_tasks!inner(user_id)")
+    .eq("week_start", weekStart)
+    .eq("weekly_tasks.user_id", userId);
+  if (error) throw new Error(error.message);
+  return (data as DbWeeklyTaskCompletion[]).map((r) => ({
+    weeklyTaskId: r.weekly_task_id,
+    weekStart: r.week_start,
+  }));
+}
+
+export async function addWeeklyTaskCompletion(
+  weeklyTaskId: string,
+  weekStart: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("weekly_task_completions")
+    .insert({ weekly_task_id: weeklyTaskId, week_start: weekStart });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeWeeklyTaskCompletion(
+  weeklyTaskId: string,
+  weekStart: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("weekly_task_completions")
+    .delete()
+    .eq("weekly_task_id", weeklyTaskId)
+    .eq("week_start", weekStart);
   if (error) throw new Error(error.message);
 }
