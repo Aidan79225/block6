@@ -1,8 +1,11 @@
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
+import type { Subtask } from "@/domain/entities/subtask";
 import { BlockEditor } from "./block-editor";
 import { StatusToggle } from "./status-toggle";
 import { DiaryForm } from "./diary-form";
+import { SubtaskList } from "./subtask-list";
+import { BlockTimer } from "./block-timer";
 
 interface SidePanelProps {
   dayOfWeek: number;
@@ -10,6 +13,10 @@ interface SidePanelProps {
   block: Block | null;
   diaryLines: { line1: string; line2: string; line3: string } | null;
   isToday: boolean;
+  subtasks: Subtask[];
+  elapsedSeconds: number;
+  isTimerActive: boolean;
+  otherBlockIsActive: boolean;
   onSaveBlock: (
     title: string,
     description: string,
@@ -17,6 +24,13 @@ interface SidePanelProps {
   ) => void;
   onStatusChange: (status: BlockStatus) => void;
   onSaveDiary: (line1: string, line2: string, line3: string) => void;
+  onAddSubtask: (title: string) => void;
+  onToggleSubtask: (id: string) => void;
+  onDeleteSubtask: (id: string) => void;
+  onReorderSubtasks: (orderedIds: string[]) => void;
+  onStartTimer: () => void;
+  onStopTimer: () => void;
+  onAddManualTimer: (startedAt: Date, endedAt: Date) => void;
   onClose: () => void;
 }
 
@@ -28,9 +42,20 @@ export function SidePanel({
   block,
   diaryLines,
   isToday,
+  subtasks,
+  elapsedSeconds,
+  isTimerActive,
+  otherBlockIsActive,
   onSaveBlock,
   onStatusChange,
   onSaveDiary,
+  onAddSubtask,
+  onToggleSubtask,
+  onDeleteSubtask,
+  onReorderSubtasks,
+  onStartTimer,
+  onStopTimer,
+  onAddManualTimer,
   onClose,
 }: SidePanelProps) {
   return (
@@ -78,20 +103,38 @@ export function SidePanel({
         onSave={onSaveBlock}
       />
       {block && (
-        <div>
-          <label
-            style={{
-              color: "var(--color-text-secondary)",
-              fontSize: "13px",
-              fontWeight: 600,
-              marginBottom: "6px",
-              display: "block",
-            }}
-          >
-            狀態
-          </label>
-          <StatusToggle status={block.status} onChange={onStatusChange} />
-        </div>
+        <>
+          <SubtaskList
+            blockId={block.id}
+            items={subtasks}
+            onAdd={onAddSubtask}
+            onToggle={onToggleSubtask}
+            onDelete={onDeleteSubtask}
+            onReorder={onReorderSubtasks}
+          />
+          <BlockTimer
+            elapsedSeconds={elapsedSeconds}
+            isActive={isTimerActive}
+            otherBlockIsActive={otherBlockIsActive}
+            onStart={onStartTimer}
+            onStop={onStopTimer}
+            onAddManual={onAddManualTimer}
+          />
+          <div>
+            <label
+              style={{
+                color: "var(--color-text-secondary)",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "6px",
+                display: "block",
+              }}
+            >
+              狀態
+            </label>
+            <StatusToggle status={block.status} onChange={onStatusChange} />
+          </div>
+        </>
       )}
       {isToday && (
         <DiaryForm
