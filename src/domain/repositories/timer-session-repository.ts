@@ -3,10 +3,7 @@ import { TimerSession } from "@/domain/entities/timer-session";
 export interface TimerSessionRepository {
   findByBlockIds(blockIds: string[]): Promise<TimerSession[]>;
   findActiveForUser(userId: string): Promise<TimerSession | null>;
-  startForBlock(
-    userId: string,
-    blockId: string,
-  ): Promise<TimerSession>;
+  startForBlock(userId: string, blockId: string): Promise<TimerSession>;
   stopActive(userId: string): Promise<void>;
   addManual(
     userId: string,

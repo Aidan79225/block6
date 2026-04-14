@@ -43,21 +43,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      const { error } = await signInWithEmail(email, password);
-      return { error };
-    },
-    [],
-  );
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { error } = await signInWithEmail(email, password);
+    return { error };
+  }, []);
 
-  const register = useCallback(
-    async (email: string, password: string) => {
-      const { error } = await signUp(email, password);
-      return { error };
-    },
-    [],
-  );
+  const register = useCallback(async (email: string, password: string) => {
+    const { error } = await signUp(email, password);
+    return { error };
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     await authSignOut();

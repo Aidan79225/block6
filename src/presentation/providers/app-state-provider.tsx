@@ -594,9 +594,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (s.endedAt) {
           total += s.durationSeconds ?? 0;
         } else {
-          total += Math.floor(
-            (now.getTime() - s.startedAt.getTime()) / 1000,
-          );
+          total += Math.floor((now.getTime() - s.startedAt.getTime()) / 1000);
         }
       }
       return total;

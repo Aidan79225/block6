@@ -96,8 +96,7 @@ export default function DashboardPage() {
 
   const selectedBlock = selected
     ? (blocks.find(
-        (b) =>
-          b.dayOfWeek === selected.dayOfWeek && b.slot === selected.slot,
+        (b) => b.dayOfWeek === selected.dayOfWeek && b.slot === selected.slot,
       ) ?? null)
     : null;
 
@@ -151,14 +150,10 @@ export default function DashboardPage() {
                 blocks={blocks}
                 onBlockClick={handleBlockClick}
                 onPreviousDay={
-                  mobileDay > 1
-                    ? () => setMobileDay((d) => d - 1)
-                    : undefined
+                  mobileDay > 1 ? () => setMobileDay((d) => d - 1) : undefined
                 }
                 onNextDay={
-                  mobileDay < 7
-                    ? () => setMobileDay((d) => d + 1)
-                    : undefined
+                  mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
                 }
               />
             ) : (
@@ -229,7 +224,9 @@ export default function DashboardPage() {
             block={selectedBlock}
             diaryLines={getDiary(formatDateKey(weekStart, selected.dayOfWeek))}
             isToday={isTodayInWeek(weekStart, selected.dayOfWeek)}
-            subtasks={selectedBlock ? getSubtasksForBlock(selectedBlock.id) : []}
+            subtasks={
+              selectedBlock ? getSubtasksForBlock(selectedBlock.id) : []
+            }
             elapsedSeconds={
               selectedBlock ? getElapsedSeconds(selectedBlock.id, now) : 0
             }

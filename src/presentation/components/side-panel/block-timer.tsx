@@ -154,7 +154,9 @@ export function BlockTimer({
             borderRadius: "var(--radius-sm)",
           }}
         >
-          <label style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
+          <label
+            style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}
+          >
             開始時間
             <input
               type="datetime-local"
@@ -171,7 +173,9 @@ export function BlockTimer({
               }}
             />
           </label>
-          <label style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
+          <label
+            style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}
+          >
             結束時間
             <input
               type="datetime-local"
@@ -188,7 +192,9 @@ export function BlockTimer({
               }}
             />
           </label>
-          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+          <div
+            style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}
+          >
             <button
               onClick={() => setShowManual(false)}
               style={{

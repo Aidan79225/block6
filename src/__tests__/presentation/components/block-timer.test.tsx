@@ -29,7 +29,9 @@ describe("BlockTimer", () => {
         onAddManual={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: /開始計時/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /開始計時/ }),
+    ).toBeInTheDocument();
   });
 
   it("shows stop button when active", () => {
@@ -43,7 +45,9 @@ describe("BlockTimer", () => {
         onAddManual={() => {}}
       />,
     );
-    expect(screen.getByRole("button", { name: /停止計時/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /停止計時/ }),
+    ).toBeInTheDocument();
   });
 
   it("calls onStart when start clicked (no other active)", async () => {

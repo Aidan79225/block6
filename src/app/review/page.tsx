@@ -9,9 +9,7 @@ import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
 import { BlockStatus, BlockType } from "@/domain/entities/block";
-import {
-  upsertReflection,
-} from "@/infrastructure/supabase/database";
+import { upsertReflection } from "@/infrastructure/supabase/database";
 import { useNotify } from "@/presentation/providers/notification-provider";
 
 export default function ReviewPage() {
@@ -103,10 +101,7 @@ export default function ReviewPage() {
         completionRate={completionRate}
       />
       <BlockTypeBreakdown byType={byType} />
-      <ReflectionEditor
-        reflection={reflection}
-        onSave={handleSaveReflection}
-      />
+      <ReflectionEditor reflection={reflection} onSave={handleSaveReflection} />
     </div>
   );
 }

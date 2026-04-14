@@ -110,7 +110,14 @@ export async function upsertBlock(
   title: string,
   description: string,
 ): Promise<Block> {
-  console.log("[BLOCK6] upsertBlock called:", { userId, weekStart, dayOfWeek, slot, blockType, title });
+  console.log("[BLOCK6] upsertBlock called:", {
+    userId,
+    weekStart,
+    dayOfWeek,
+    slot,
+    blockType,
+    title,
+  });
 
   const weekPlanId = await getOrCreateWeekPlan(userId, weekStart);
   console.log("[BLOCK6] weekPlanId:", weekPlanId);
@@ -358,9 +365,7 @@ export async function deleteSubtask(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export async function reorderSubtasks(
-  orderedIds: string[],
-): Promise<void> {
+export async function reorderSubtasks(orderedIds: string[]): Promise<void> {
   const OFFSET = 10000;
   // Phase 1: move to high temporary positions to avoid UNIQUE(block_id, position) collisions
   for (let i = 0; i < orderedIds.length; i++) {
