@@ -3,13 +3,20 @@ import { BlockCell } from "./block-cell";
 
 interface WeekGridProps {
   blocks: Block[];
+  selectedDayOfWeek?: number | null;
+  selectedSlot?: number | null;
   onBlockClick: (dayOfWeek: number, slot: number) => void;
 }
 
 const DAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
 const SLOTS = [1, 2, 3, 4, 5, 6];
 
-export function WeekGrid({ blocks, onBlockClick }: WeekGridProps) {
+export function WeekGrid({
+  blocks,
+  selectedDayOfWeek,
+  selectedSlot,
+  onBlockClick,
+}: WeekGridProps) {
   function findBlock(day: number, slot: number): Block | null {
     return blocks.find((b) => b.dayOfWeek === day && b.slot === slot) ?? null;
   }
@@ -45,6 +52,9 @@ export function WeekGrid({ blocks, onBlockClick }: WeekGridProps) {
             <BlockCell
               key={`${dayOfWeek}-${slot}`}
               block={block}
+              isSelected={
+                selectedDayOfWeek === dayOfWeek && selectedSlot === slot
+              }
               onClick={() => onBlockClick(dayOfWeek, slot)}
             />
           );

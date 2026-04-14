@@ -11,6 +11,7 @@
   --color-block-core: #3fb950;
   --color-block-rest: #d29922;
   --color-block-buffer: #f85149;
+  --color-block-general: #7d8590;
   --color-status-completed: #3fb950;
   --color-status-in-progress: #58a6ff;
   --color-status-planned: #21262d;
@@ -34,6 +35,7 @@
   --color-block-core: #1a7f37;
   --color-block-rest: #9a6700;
   --color-block-buffer: #cf222e;
+  --color-block-general: #656d76;
   --color-status-completed: #1a7f37;
   --color-status-in-progress: #0969da;
   --color-status-planned: #eaeef2;

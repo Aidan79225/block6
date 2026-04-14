@@ -103,7 +103,7 @@ export function SidePanel({
         key={`editor-${dayOfWeek}-${slot}`}
         title={block?.title ?? ""}
         description={block?.description ?? ""}
-        blockType={block?.blockType ?? BlockType.Core}
+        blockType={block?.blockType ?? BlockType.General}
         onSave={onSaveBlock}
       />
       {block && (

@@ -10,12 +10,14 @@ const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
   [BlockType.Rest]: 2,
   [BlockType.Buffer]: 3,
+  [BlockType.General]: 4,
 };
 
 const BLOCK_TYPE_REVERSE: Record<number, BlockType> = {
   1: BlockType.Core,
   2: BlockType.Rest,
   3: BlockType.Buffer,
+  4: BlockType.General,
 };
 
 interface DbBlock {

@@ -8,6 +8,7 @@ interface BlockTypeBreakdownProps {
     core: TypeData;
     rest: TypeData;
     buffer: TypeData;
+    general: TypeData;
   };
 }
 
@@ -15,6 +16,11 @@ const typeConfig = [
   { key: "core" as const, label: "核心", color: "var(--color-block-core)" },
   { key: "rest" as const, label: "休息", color: "var(--color-block-rest)" },
   { key: "buffer" as const, label: "緩衝", color: "var(--color-block-buffer)" },
+  {
+    key: "general" as const,
+    label: "一般",
+    color: "var(--color-block-general)",
+  },
 ];
 
 export function BlockTypeBreakdown({ byType }: BlockTypeBreakdownProps) {

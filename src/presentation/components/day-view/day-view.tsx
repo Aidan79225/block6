@@ -4,6 +4,8 @@ import { BlockCard } from "./block-card";
 interface DayViewProps {
   dayOfWeek: number;
   blocks: Block[];
+  selectedDayOfWeek?: number | null;
+  selectedSlot?: number | null;
   onBlockClick: (dayOfWeek: number, slot: number) => void;
   onPreviousDay?: () => void;
   onNextDay?: () => void;
@@ -14,6 +16,8 @@ const DAY_LABELS = ["", "週一", "週二", "週三", "週四", "週五", "週�
 export function DayView({
   dayOfWeek,
   blocks,
+  selectedDayOfWeek,
+  selectedSlot,
   onBlockClick,
   onPreviousDay,
   onNextDay,
@@ -83,6 +87,9 @@ export function DayView({
             key={slot}
             block={block}
             slot={slot}
+            isSelected={
+              selectedDayOfWeek === dayOfWeek && selectedSlot === slot
+            }
             onClick={() => onBlockClick(dayOfWeek, slot)}
           />
         );

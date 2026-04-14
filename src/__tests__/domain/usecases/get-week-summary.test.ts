@@ -64,14 +64,12 @@ describe("GetWeekSummaryUseCase", () => {
     expect(summary.completedBlocks).toBe(2);
     expect(summary.completionRate).toBeCloseTo(0.5);
 
-    expect(summary.byType[BlockType.Core].total).toBe(2);
-    expect(summary.byType[BlockType.Core].completed).toBe(1);
-
-    expect(summary.byType[BlockType.Rest].total).toBe(1);
-    expect(summary.byType[BlockType.Rest].completed).toBe(1);
-
-    expect(summary.byType[BlockType.Buffer].total).toBe(1);
-    expect(summary.byType[BlockType.Buffer].completed).toBe(0);
+    expect(summary.byType).toEqual({
+      core: { total: 2, completed: 1 },
+      rest: { total: 1, completed: 1 },
+      buffer: { total: 1, completed: 0 },
+      general: { total: 0, completed: 0 },
+    });
   });
 
   it("returns zero counts and rate=0 for an empty week plan", async () => {
@@ -88,5 +86,6 @@ describe("GetWeekSummaryUseCase", () => {
     expect(summary.byType[BlockType.Core].total).toBe(0);
     expect(summary.byType[BlockType.Rest].total).toBe(0);
     expect(summary.byType[BlockType.Buffer].total).toBe(0);
+    expect(summary.byType[BlockType.General].total).toBe(0);
   });
 });
