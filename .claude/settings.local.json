@@ -14,7 +14,8 @@
       "Bash(curl -s http://localhost:3000/)",
       "Bash(ls:*)",
       "Bash(git commit:*)",
-      "Bash(pnpm format:check:*)"
+      "Bash(pnpm format:check:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

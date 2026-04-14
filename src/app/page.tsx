@@ -46,28 +46,44 @@ export default function DashboardPage() {
     getDiary,
     loadWeek,
     loadDiary,
+    getSubtasksForBlock,
+    addSubtask,
+    editSubtask,
+    toggleSubtask,
+    deleteSubtask,
+    reorderSubtasks,
+    activeTimer,
+    getElapsedSeconds,
+    startTimer,
+    stopTimer,
+    addManualTimer,
+    clearTimer,
   } = useAppState();
   const [selected, setSelected] = useState<SelectedCell | null>(null);
-  const [mobileDay, setMobileDay] = useState<number>(
-    new Date().getDay() || 7,
-  );
+  const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
   const [mobileView, setMobileView] = useState<"day" | "overview">("day");
+  const [, forceTick] = useState(0);
 
   const weekKey = weekStart.toISOString().split("T")[0];
   const blocks = getBlocksForWeek(weekKey);
 
-  // Load data from Supabase when week changes
   useEffect(() => {
     loadWeek(weekKey);
   }, [weekKey, loadWeek]);
 
-  // Load diary when a cell is selected
   useEffect(() => {
     if (selected) {
       const dateKey = formatDateKey(weekStart, selected.dayOfWeek);
       loadDiary(dateKey);
     }
   }, [selected, weekStart, loadDiary]);
+
+  // Force a re-render every second while a timer is running
+  useEffect(() => {
+    if (!activeTimer) return;
+    const interval = setInterval(() => forceTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [activeTimer]);
 
   const completedCount = blocks.filter(
     (b) => b.status === BlockStatus.Completed,
@@ -79,6 +95,12 @@ export default function DashboardPage() {
   const handleBlockClick = (dayOfWeek: number, slot: number) => {
     setSelected({ dayOfWeek, slot });
   };
+
+  const selectedBlock = selected
+    ? (blocks.find(
+        (b) => b.dayOfWeek === selected.dayOfWeek && b.slot === selected.slot,
+      ) ?? null)
+    : null;
 
   const handleSaveBlock = (
     title: string,
@@ -97,12 +119,8 @@ export default function DashboardPage() {
   };
 
   const handleStatusChange = (status: BlockStatus) => {
-    if (!selected) return;
-    const block = blocks.find(
-      (b) => b.dayOfWeek === selected.dayOfWeek && b.slot === selected.slot,
-    );
-    if (!block) return;
-    updateStatus(block.id, status);
+    if (!selectedBlock) return;
+    updateStatus(selectedBlock.id, status);
   };
 
   const handleSaveDiary = (line1: string, line2: string, line3: string) => {
@@ -134,14 +152,10 @@ export default function DashboardPage() {
                 blocks={blocks}
                 onBlockClick={handleBlockClick}
                 onPreviousDay={
-                  mobileDay > 1
-                    ? () => setMobileDay((d) => d - 1)
-                    : undefined
+                  mobileDay > 1 ? () => setMobileDay((d) => d - 1) : undefined
                 }
                 onNextDay={
-                  mobileDay < 7
-                    ? () => setMobileDay((d) => d + 1)
-                    : undefined
+                  mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
                 }
               />
             ) : (
@@ -209,18 +223,49 @@ export default function DashboardPage() {
           <SidePanel
             dayOfWeek={selected.dayOfWeek}
             slot={selected.slot}
-            block={
-              blocks.find(
-                (b) =>
-                  b.dayOfWeek === selected.dayOfWeek &&
-                  b.slot === selected.slot,
-              ) ?? null
-            }
+            block={selectedBlock}
             diaryLines={getDiary(formatDateKey(weekStart, selected.dayOfWeek))}
             isToday={isTodayInWeek(weekStart, selected.dayOfWeek)}
+            subtasks={
+              selectedBlock ? getSubtasksForBlock(selectedBlock.id) : []
+            }
+            elapsedSeconds={
+              selectedBlock
+                ? getElapsedSeconds(selectedBlock.id, new Date())
+                : 0
+            }
+            isTimerActive={
+              !!(selectedBlock && activeTimer?.blockId === selectedBlock.id)
+            }
+            otherBlockIsActive={
+              !!activeTimer &&
+              !!selectedBlock &&
+              activeTimer.blockId !== selectedBlock.id
+            }
             onSaveBlock={handleSaveBlock}
             onStatusChange={handleStatusChange}
             onSaveDiary={handleSaveDiary}
+            onAddSubtask={(title) => {
+              if (selectedBlock) addSubtask(selectedBlock.id, title);
+            }}
+            onEditSubtask={editSubtask}
+            onToggleSubtask={toggleSubtask}
+            onDeleteSubtask={deleteSubtask}
+            onReorderSubtasks={(orderedIds) => {
+              if (selectedBlock) reorderSubtasks(selectedBlock.id, orderedIds);
+            }}
+            onStartTimer={() => {
+              if (selectedBlock) startTimer(selectedBlock.id);
+            }}
+            onStopTimer={() => {
+              stopTimer();
+            }}
+            onAddManualTimer={(s, e) => {
+              if (selectedBlock) addManualTimer(selectedBlock.id, s, e);
+            }}
+            onClearTimer={() => {
+              if (selectedBlock) clearTimer(selectedBlock.id);
+            }}
             onClose={() => setSelected(null)}
           />
         )}

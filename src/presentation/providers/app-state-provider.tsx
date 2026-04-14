@@ -12,6 +12,9 @@ import {
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import { useAuth } from "./auth-provider";
+import { useNotify } from "./notification-provider";
+import type { Subtask } from "@/domain/entities/subtask";
+import type { TimerSession } from "@/domain/entities/timer-session";
 import {
   fetchBlocksForWeek,
   upsertBlock,
@@ -19,6 +22,18 @@ import {
   fetchDiary,
   upsertDiary,
   fetchReflection,
+  fetchSubtasksForBlocks,
+  addSubtask as dbAddSubtask,
+  updateSubtaskTitle as dbUpdateSubtaskTitle,
+  toggleSubtaskCompleted as dbToggleSubtask,
+  deleteSubtask as dbDeleteSubtask,
+  reorderSubtasks as dbReorderSubtasks,
+  fetchTimerSessionsForBlocks,
+  fetchActiveSession,
+  startTimerForBlock,
+  stopActiveSession,
+  addManualSession as dbAddManualSession,
+  deleteSessionsForBlock as dbDeleteSessionsForBlock,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 
@@ -47,6 +62,24 @@ interface AppState {
   loadWeek: (weekKey: string) => void;
   loadDiary: (dateKey: string) => void;
   loadReflection: (weekKey: string) => void;
+  subtasks: Subtask[];
+  getSubtasksForBlock: (blockId: string) => Subtask[];
+  addSubtask: (blockId: string, title: string) => void;
+  editSubtask: (id: string, title: string) => void;
+  toggleSubtask: (id: string) => void;
+  deleteSubtask: (id: string) => void;
+  reorderSubtasks: (blockId: string, orderedIds: string[]) => void;
+  timerSessions: TimerSession[];
+  activeTimer: TimerSession | null;
+  getElapsedSeconds: (blockId: string, now: Date) => number;
+  startTimer: (blockId: string) => Promise<void>;
+  stopTimer: () => Promise<void>;
+  addManualTimer: (
+    blockId: string,
+    startedAt: Date,
+    endedAt: Date,
+  ) => Promise<void>;
+  clearTimer: (blockId: string) => Promise<void>;
 }
 
 // --- localStorage helpers ---
@@ -196,6 +229,7 @@ const AppStateContext = createContext<AppState | null>(null);
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
+  const notify = useNotify();
 
   // SSR-safe read of localStorage
   const localData = useSyncExternalStore(
@@ -208,6 +242,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [supaBlocks, setSupaBlocks] = useState<Block[]>([]);
   const [supaDiary, setSupaDiary] = useState<Record<string, DiaryLines>>({});
   const [supaReflection, setSupaReflection] = useState("");
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [timerSessions, setTimerSessions] = useState<TimerSession[]>([]);
+  const [activeTimer, setActiveTimer] = useState<TimerSession | null>(null);
 
   const loadedWeeks = useRef<Set<string>>(new Set());
   const migrationDone = useRef(false);
@@ -233,10 +270,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           loadedWeeks.current.clear();
         })
         .catch((err) => {
-          console.error("[BLOCK6] Migration failed:", err);
+          console.error(err);
+          notify.error("資料遷移失敗，請重試");
         });
     }
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, notify]);
+
+  useEffect(() => {
+    const promise = isLoggedIn
+      ? fetchActiveSession(user!.id)
+      : Promise.resolve(null);
+    promise
+      .then((active) => setActiveTimer(active))
+      .catch((err) => {
+        console.error(err);
+        notify.error("載入計時器狀態失敗");
+      });
+  }, [isLoggedIn, user, notify]);
 
   // Load a week's blocks from Supabase
   const loadWeek = useCallback(
@@ -244,20 +294,37 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (!user || loadedWeeks.current.has(weekKey)) return;
       loadedWeeks.current.add(weekKey);
       fetchBlocksForWeek(user.id, weekKey)
-        .then((fetched) => {
+        .then(async (fetched) => {
           setSupaBlocks((prev) => {
             const withoutThisWeek = prev.filter(
               (b) => b.weekPlanId !== weekKey,
             );
             return [...withoutThisWeek, ...fetched];
           });
+          if (fetched.length > 0) {
+            const ids = fetched.map((b) => b.id);
+            const [fetchedSubs, fetchedSessions] = await Promise.all([
+              fetchSubtasksForBlocks(ids),
+              fetchTimerSessionsForBlocks(ids),
+            ]);
+            const blockIdSet = new Set(ids);
+            setSubtasks((prev) => {
+              const other = prev.filter((s) => !blockIdSet.has(s.blockId));
+              return [...other, ...fetchedSubs];
+            });
+            setTimerSessions((prev) => {
+              const other = prev.filter((s) => !blockIdSet.has(s.blockId));
+              return [...other, ...fetchedSessions];
+            });
+          }
         })
         .catch((err) => {
-          console.error("[BLOCK6] Failed to load week:", err);
+          console.error(err);
+          notify.error("載入週資料失敗");
           loadedWeeks.current.delete(weekKey);
         });
     },
-    [user],
+    [user, notify],
   );
 
   const loadDiary = useCallback(
@@ -354,7 +421,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             );
           })
           .catch((err) => {
-            console.error("[BLOCK6] Failed to save block:", err);
+            console.error(err);
+            notify.error("區塊儲存失敗");
           });
       } else {
         // Local mode: update localStorage directly
@@ -383,7 +451,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveToStorage(current);
       }
     },
-    [user],
+    [user, notify],
   );
 
   const updateStatus = useCallback(
@@ -395,7 +463,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           ),
         );
         updateBlockStatus(blockId, status).catch((err) => {
-          console.error("[BLOCK6] Failed to update status:", err);
+          console.error(err);
+          notify.error("狀態更新失敗");
         });
       } else {
         const current = loadFromStorage();
@@ -405,7 +474,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveToStorage(current);
       }
     },
-    [user],
+    [user, notify],
   );
 
   const saveDiary = useCallback(
@@ -416,7 +485,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           [dateKey]: { line1, line2, line3 },
         }));
         upsertDiary(user.id, dateKey, line1, line2, line3).catch((err) => {
-          console.error("[BLOCK6] Failed to save diary:", err);
+          console.error(err);
+          notify.error("日記儲存失敗");
         });
       } else {
         const current = loadFromStorage();
@@ -424,7 +494,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveToStorage(current);
       }
     },
-    [user],
+    [user, notify],
   );
 
   const getDiary = useCallback(
@@ -447,6 +517,202 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const getSubtasksForBlock = useCallback(
+    (blockId: string): Subtask[] => {
+      return subtasks
+        .filter((s) => s.blockId === blockId)
+        .sort((a, b) => a.position - b.position);
+    },
+    [subtasks],
+  );
+
+  const addSubtask = useCallback(
+    (blockId: string, title: string) => {
+      if (!user) return;
+      const existing = subtasks.filter((s) => s.blockId === blockId);
+      const position =
+        existing.length === 0
+          ? 0
+          : Math.max(...existing.map((s) => s.position)) + 1;
+      dbAddSubtask(blockId, title, position)
+        .then((created) => setSubtasks((prev) => [...prev, created]))
+        .catch((err) => {
+          console.error(err);
+          notify.error("細項新增失敗");
+        });
+    },
+    [user, subtasks, notify],
+  );
+
+  const editSubtask = useCallback(
+    (id: string, title: string) => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, title: trimmed } : s)),
+      );
+      dbUpdateSubtaskTitle(id, trimmed).catch((err) => {
+        console.error(err);
+        notify.error("細項更新失敗");
+      });
+    },
+    [notify],
+  );
+
+  const toggleSubtask = useCallback(
+    (id: string) => {
+      const target = subtasks.find((s) => s.id === id);
+      if (!target) return;
+      const newCompleted = !target.completed;
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, completed: newCompleted } : s)),
+      );
+      dbToggleSubtask(id, newCompleted).catch((err) => {
+        console.error(err);
+        notify.error("細項更新失敗");
+      });
+    },
+    [subtasks, notify],
+  );
+
+  const deleteSubtask = useCallback(
+    (id: string) => {
+      setSubtasks((prev) => prev.filter((s) => s.id !== id));
+      dbDeleteSubtask(id).catch((err) => {
+        console.error(err);
+        notify.error("細項刪除失敗");
+      });
+    },
+    [notify],
+  );
+
+  const reorderSubtasks = useCallback(
+    (_blockId: string, orderedIds: string[]) => {
+      // Optimistic update: renumber locally
+      setSubtasks((prev) => {
+        const positionMap = new Map(orderedIds.map((id, i) => [id, i]));
+        return prev.map((s) =>
+          positionMap.has(s.id)
+            ? { ...s, position: positionMap.get(s.id)! }
+            : s,
+        );
+      });
+      dbReorderSubtasks(orderedIds).catch((err) => {
+        console.error(err);
+        notify.error("細項排序失敗");
+      });
+    },
+    [notify],
+  );
+
+  const getElapsedSeconds = useCallback(
+    (blockId: string, now: Date): number => {
+      const sessions = timerSessions.filter((s) => s.blockId === blockId);
+      let total = 0;
+      for (const s of sessions) {
+        if (s.endedAt) {
+          total += Math.max(0, s.durationSeconds ?? 0);
+        } else {
+          total += Math.max(
+            0,
+            Math.floor((now.getTime() - s.startedAt.getTime()) / 1000),
+          );
+        }
+      }
+      return total;
+    },
+    [timerSessions],
+  );
+
+  const startTimer = useCallback(
+    async (blockId: string) => {
+      if (!user) return;
+      try {
+        if (activeTimer) {
+          const nowDate = new Date();
+          const duration = Math.floor(
+            (nowDate.getTime() - activeTimer.startedAt.getTime()) / 1000,
+          );
+          setTimerSessions((prev) =>
+            prev.map((s) =>
+              s.id === activeTimer.id
+                ? { ...s, endedAt: nowDate, durationSeconds: duration }
+                : s,
+            ),
+          );
+        }
+        const newSession = await startTimerForBlock(user.id, blockId);
+        setActiveTimer(newSession);
+        setTimerSessions((prev) => {
+          const existing = prev.find((s) => s.id === newSession.id);
+          return existing ? prev : [...prev, newSession];
+        });
+      } catch (err) {
+        console.error(err);
+        notify.error("計時器啟動失敗");
+      }
+    },
+    [user, activeTimer, notify],
+  );
+
+  const stopTimer = useCallback(async () => {
+    if (!user || !activeTimer) return;
+    try {
+      await stopActiveSession(user.id);
+      const nowDate = new Date();
+      const duration = Math.floor(
+        (nowDate.getTime() - activeTimer.startedAt.getTime()) / 1000,
+      );
+      setTimerSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeTimer.id
+            ? { ...s, endedAt: nowDate, durationSeconds: duration }
+            : s,
+        ),
+      );
+      setActiveTimer(null);
+    } catch (err) {
+      console.error(err);
+      notify.error("計時器停止失敗");
+    }
+  }, [user, activeTimer, notify]);
+
+  const addManualTimer = useCallback(
+    async (blockId: string, startedAt: Date, endedAt: Date) => {
+      if (!user) return;
+      try {
+        const created = await dbAddManualSession(
+          user.id,
+          blockId,
+          startedAt,
+          endedAt,
+        );
+        setTimerSessions((prev) => [...prev, created]);
+      } catch (err) {
+        console.error(err);
+        notify.error("手動新增時段失敗");
+      }
+    },
+    [user, notify],
+  );
+
+  const clearTimer = useCallback(
+    async (blockId: string) => {
+      if (!user) return;
+      try {
+        await dbDeleteSessionsForBlock(blockId);
+        setTimerSessions((prev) => prev.filter((s) => s.blockId !== blockId));
+        if (activeTimer?.blockId === blockId) {
+          setActiveTimer(null);
+        }
+      } catch (err) {
+        console.error(err);
+        notify.error("清除計時失敗");
+      }
+    },
+    [user, activeTimer, notify],
+  );
+
   return (
     <AppStateContext.Provider
       value={{
@@ -462,6 +728,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         loadWeek,
         loadDiary,
         loadReflection,
+        subtasks,
+        getSubtasksForBlock,
+        addSubtask,
+        editSubtask,
+        toggleSubtask,
+        deleteSubtask,
+        reorderSubtasks,
+        timerSessions,
+        activeTimer,
+        getElapsedSeconds,
+        startTimer,
+        stopTimer,
+        addManualTimer,
+        clearTimer,
       }}
     >
       {children}

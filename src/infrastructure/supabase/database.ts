@@ -1,6 +1,10 @@
 import { supabase } from "./client";
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
+import type { Subtask } from "@/domain/entities/subtask";
+import { createSubtask } from "@/domain/entities/subtask";
+import type { TimerSession } from "@/domain/entities/timer-session";
+import { createTimerSession } from "@/domain/entities/timer-session";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
@@ -106,7 +110,14 @@ export async function upsertBlock(
   title: string,
   description: string,
 ): Promise<Block> {
-  console.log("[BLOCK6] upsertBlock called:", { userId, weekStart, dayOfWeek, slot, blockType, title });
+  console.log("[BLOCK6] upsertBlock called:", {
+    userId,
+    weekStart,
+    dayOfWeek,
+    slot,
+    blockType,
+    title,
+  });
 
   const weekPlanId = await getOrCreateWeekPlan(userId, weekStart);
   console.log("[BLOCK6] weekPlanId:", weekPlanId);
@@ -285,4 +296,235 @@ export async function upsertReflection(
       .insert({ week_plan_id: weekPlanId, reflection });
     if (error) throw new Error(error.message);
   }
+}
+
+// --- Subtasks ---
+
+interface DbSubtask {
+  id: string;
+  block_id: string;
+  title: string;
+  completed: boolean;
+  position: number;
+  created_at: string;
+}
+
+function dbSubtaskToEntity(db: DbSubtask): Subtask {
+  return createSubtask({
+    id: db.id,
+    blockId: db.block_id,
+    title: db.title,
+    completed: db.completed,
+    position: db.position,
+    createdAt: new Date(db.created_at),
+  });
+}
+
+export async function fetchSubtasksForBlocks(
+  blockIds: string[],
+): Promise<Subtask[]> {
+  if (blockIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("subtasks")
+    .select("*")
+    .in("block_id", blockIds)
+    .order("position", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data as DbSubtask[]).map(dbSubtaskToEntity);
+}
+
+export async function addSubtask(
+  blockId: string,
+  title: string,
+  position: number,
+): Promise<Subtask> {
+  const { data, error } = await supabase
+    .from("subtasks")
+    .insert({ block_id: blockId, title, position })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return dbSubtaskToEntity(data as DbSubtask);
+}
+
+export async function updateSubtaskTitle(
+  id: string,
+  title: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("subtasks")
+    .update({ title })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function toggleSubtaskCompleted(
+  id: string,
+  completed: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from("subtasks")
+    .update({ completed })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteSubtask(id: string): Promise<void> {
+  const { error } = await supabase.from("subtasks").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function reorderSubtasks(orderedIds: string[]): Promise<void> {
+  const OFFSET = 10000;
+  // Phase 1: move to high temporary positions to avoid UNIQUE(block_id, position) collisions
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("subtasks")
+      .update({ position: OFFSET + i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
+  // Phase 2: set final positions 0..N-1
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("subtasks")
+      .update({ position: i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
+}
+
+// --- Timer Sessions ---
+
+interface DbTimerSession {
+  id: string;
+  block_id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number | null;
+}
+
+function dbTimerSessionToEntity(db: DbTimerSession): TimerSession {
+  return createTimerSession({
+    id: db.id,
+    blockId: db.block_id,
+    userId: db.user_id,
+    startedAt: new Date(db.started_at),
+    endedAt: db.ended_at ? new Date(db.ended_at) : null,
+    durationSeconds: db.duration_seconds,
+  });
+}
+
+export async function fetchTimerSessionsForBlocks(
+  blockIds: string[],
+): Promise<TimerSession[]> {
+  if (blockIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("timer_sessions")
+    .select("*")
+    .in("block_id", blockIds);
+
+  if (error) throw new Error(error.message);
+  return (data as DbTimerSession[]).map(dbTimerSessionToEntity);
+}
+
+export async function fetchActiveSession(
+  userId: string,
+): Promise<TimerSession | null> {
+  const { data, error } = await supabase
+    .from("timer_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .is("ended_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbTimerSessionToEntity(data as DbTimerSession);
+}
+
+export async function stopActiveSession(userId: string): Promise<void> {
+  const { data: active, error: findErr } = await supabase
+    .from("timer_sessions")
+    .select("id, started_at")
+    .eq("user_id", userId)
+    .is("ended_at", null)
+    .maybeSingle();
+
+  if (findErr) throw new Error(findErr.message);
+  if (!active) return;
+
+  const startedAt = new Date(active.started_at);
+  const endedAt = new Date();
+  const durationSeconds = Math.floor(
+    (endedAt.getTime() - startedAt.getTime()) / 1000,
+  );
+
+  const { error } = await supabase
+    .from("timer_sessions")
+    .update({
+      ended_at: endedAt.toISOString(),
+      duration_seconds: durationSeconds,
+    })
+    .eq("id", active.id);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function startTimerForBlock(
+  userId: string,
+  blockId: string,
+): Promise<TimerSession> {
+  // Stop any existing active session first
+  await stopActiveSession(userId);
+
+  const { data, error } = await supabase
+    .from("timer_sessions")
+    .insert({
+      block_id: blockId,
+      user_id: userId,
+      started_at: new Date().toISOString(),
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return dbTimerSessionToEntity(data as DbTimerSession);
+}
+
+export async function addManualSession(
+  userId: string,
+  blockId: string,
+  startedAt: Date,
+  endedAt: Date,
+): Promise<TimerSession> {
+  const durationSeconds = Math.floor(
+    (endedAt.getTime() - startedAt.getTime()) / 1000,
+  );
+
+  const { data, error } = await supabase
+    .from("timer_sessions")
+    .insert({
+      block_id: blockId,
+      user_id: userId,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt.toISOString(),
+      duration_seconds: durationSeconds,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return dbTimerSessionToEntity(data as DbTimerSession);
+}
+
+export async function deleteSessionsForBlock(blockId: string): Promise<void> {
+  const { error } = await supabase
+    .from("timer_sessions")
+    .delete()
+    .eq("block_id", blockId);
+  if (error) throw new Error(error.message);
 }
