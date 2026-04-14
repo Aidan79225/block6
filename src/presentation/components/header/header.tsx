@@ -23,14 +23,16 @@ export function Header({
 }: HeaderProps) {
   return (
     <header
+      className="app-header"
       style={{
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        padding: "12px 24px",
+        padding: "12px 16px",
         backgroundColor: "var(--color-bg-secondary)",
         borderBottom: "1px solid var(--color-border)",
-        gap: "12px",
+        gap: "8px",
+        minWidth: 0,
       }}
     >
       <h1
@@ -39,6 +41,7 @@ export function Header({
           fontWeight: 700,
           color: "var(--color-accent)",
           whiteSpace: "nowrap",
+          flexShrink: 0,
         }}
       >
         The Block 6
@@ -48,10 +51,11 @@ export function Header({
         onPreviousWeek={onPreviousWeek}
         onNextWeek={onNextWeek}
       />
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
         {userEmail ? (
           <>
             <span
+              className="desktop-only"
               style={{
                 color: "var(--color-text-secondary)",
                 fontSize: "12px",

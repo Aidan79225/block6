@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CompletionStats } from "@/presentation/components/review/completion-stats";
 import { BlockTypeBreakdown } from "@/presentation/components/review/block-type-breakdown";
 import { ReflectionEditor } from "@/presentation/components/review/reflection-editor";
+import { TaskTimeRanking } from "@/presentation/components/review/task-time-ranking";
+import { DiaryWeekView } from "@/presentation/components/review/diary-week-view";
 import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
@@ -22,6 +24,9 @@ export default function ReviewPage() {
     setReflection,
     loadWeek,
     loadReflection,
+    getTaskTimeRanking,
+    loadDiary,
+    diaryEntries,
   } = useAppState();
 
   const weekKey = weekStart.toISOString().split("T")[0];
@@ -31,6 +36,15 @@ export default function ReviewPage() {
     loadWeek(weekKey);
     loadReflection(weekKey);
   }, [weekKey, loadWeek, loadReflection]);
+
+  useEffect(() => {
+    for (let dow = 1; dow <= 7; dow++) {
+      const d = new Date(weekStart);
+      d.setDate(d.getDate() + (dow - 1));
+      const dateKey = d.toISOString().split("T")[0];
+      loadDiary(dateKey);
+    }
+  }, [weekStart, loadDiary]);
 
   const totalBlocks = blocks.length;
   const completedBlocks = blocks.filter(
@@ -50,6 +64,23 @@ export default function ReviewPage() {
     if (block.status === BlockStatus.Completed) {
       byType[key].completed++;
     }
+  }
+
+  const [now] = useState(() => new Date());
+  const ranking = getTaskTimeRanking(weekKey, now);
+
+  const weekDiaries: Array<{
+    dayOfWeek: number;
+    line1: string;
+    line2: string;
+    line3: string;
+  } | null> = [];
+  for (let dow = 1; dow <= 7; dow++) {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + (dow - 1));
+    const dateKey = d.toISOString().split("T")[0];
+    const entry = diaryEntries[dateKey];
+    weekDiaries.push(entry ? { dayOfWeek: dow, ...entry } : null);
   }
 
   const handleSaveReflection = (text: string) => {
@@ -102,6 +133,8 @@ export default function ReviewPage() {
         completionRate={completionRate}
       />
       <BlockTypeBreakdown byType={byType} />
+      <TaskTimeRanking items={ranking} />
+      <DiaryWeekView entries={weekDiaries} />
       <ReflectionEditor reflection={reflection} onSave={handleSaveReflection} />
     </div>
   );

@@ -13,6 +13,7 @@ import {
 import type { TitleSuggestion } from "@/presentation/components/side-panel/task-title-autocomplete";
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
+import type { WeeklyTask } from "@/domain/entities/weekly-task";
 import { useAuth } from "./auth-provider";
 import { useNotify } from "./notification-provider";
 import type { Subtask } from "@/domain/entities/subtask";
@@ -38,6 +39,14 @@ import {
   deleteSessionsForBlock as dbDeleteSessionsForBlock,
   swapBlocksInDb,
   moveBlockInDb,
+  fetchActiveWeeklyTasks,
+  addWeeklyTask as dbAddWeeklyTask,
+  updateWeeklyTaskTitle as dbUpdateWeeklyTaskTitle,
+  setWeeklyTaskActive as dbSetWeeklyTaskActive,
+  reorderWeeklyTasks as dbReorderWeeklyTasks,
+  fetchWeeklyTaskCompletions,
+  addWeeklyTaskCompletion as dbAddWeeklyTaskCompletion,
+  removeWeeklyTaskCompletion as dbRemoveWeeklyTaskCompletion,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 
@@ -87,6 +96,18 @@ interface AppState {
   ) => Promise<void>;
   clearTimer: (blockId: string) => Promise<void>;
   taskTitleSuggestions: TitleSuggestion[];
+  weeklyTasks: WeeklyTask[];
+  weeklyCompletions: Record<string, Set<string>>;
+  addWeeklyTask: (title: string) => void;
+  editWeeklyTask: (id: string, title: string) => void;
+  disableWeeklyTask: (id: string) => void;
+  reorderWeeklyTasks: (orderedIds: string[]) => void;
+  toggleWeeklyTaskCompletion: (id: string, weekKey: string) => void;
+  loadWeeklyCompletions: (weekKey: string) => void;
+  getTaskTimeRanking: (
+    weekKey: string,
+    now: Date,
+  ) => Array<{ title: string; totalSeconds: number }>;
 }
 
 // --- localStorage helpers ---
@@ -248,12 +269,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Supabase-sourced state (only used when logged in)
   const [supaBlocks, setSupaBlocks] = useState<Block[]>([]);
   const [supaDiary, setSupaDiary] = useState<Record<string, DiaryLines>>({});
+  const supaDiaryRef = useRef(supaDiary);
+  useEffect(() => {
+    supaDiaryRef.current = supaDiary;
+  }, [supaDiary]);
   const [supaReflection, setSupaReflection] = useState("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [timerSessions, setTimerSessions] = useState<TimerSession[]>([]);
   const [activeTimer, setActiveTimer] = useState<TimerSession | null>(null);
+  const [weeklyTasks, setWeeklyTasks] = useState<WeeklyTask[]>([]);
+  const [weeklyCompletions, setWeeklyCompletions] = useState<
+    Record<string, Set<string>>
+  >({});
 
   const loadedWeeks = useRef<Set<string>>(new Set());
+  const loadedCompletionsWeeks = useRef<Set<string>>(new Set());
   const migrationDone = useRef(false);
 
   const isLoggedIn = !authLoading && !!user;
@@ -293,6 +323,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           notify.error("資料遷移失敗，請重試");
         });
     }
+  }, [isLoggedIn, user, notify]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      Promise.resolve().then(() => setWeeklyTasks([]));
+      return;
+    }
+    fetchActiveWeeklyTasks(user!.id)
+      .then((list) => setWeeklyTasks(list))
+      .catch((err) => {
+        console.error(err);
+        notify.error("載入週任務清單失敗");
+      });
   }, [isLoggedIn, user, notify]);
 
   useEffect(() => {
@@ -346,16 +389,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, notify],
   );
 
+  const triedDiaryDates = useRef<Set<string>>(new Set());
   const loadDiary = useCallback(
     (dateKey: string) => {
-      if (!user || supaDiary[dateKey]) return;
+      if (!user) return;
+      if (supaDiaryRef.current[dateKey]) return;
+      if (triedDiaryDates.current.has(`${user.id}:${dateKey}`)) return;
+      triedDiaryDates.current.add(`${user.id}:${dateKey}`);
       fetchDiary(user.id, dateKey).then((entry) => {
         if (entry) {
           setSupaDiary((prev) => ({ ...prev, [dateKey]: entry }));
         }
       });
     },
-    [user, supaDiary],
+    [user],
   );
 
   const loadReflection = useCallback(
@@ -679,6 +726,137 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [notify],
   );
 
+  const addWeeklyTask = useCallback(
+    (title: string) => {
+      if (!user) return;
+      const position =
+        weeklyTasks.length === 0
+          ? 0
+          : Math.max(...weeklyTasks.map((t) => t.position)) + 1;
+      dbAddWeeklyTask(user.id, title, position)
+        .then((created) => setWeeklyTasks((prev) => [...prev, created]))
+        .catch((err) => {
+          console.error(err);
+          notify.error("週任務新增失敗");
+        });
+    },
+    [user, weeklyTasks, notify],
+  );
+
+  const editWeeklyTask = useCallback(
+    (id: string, title: string) => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+      setWeeklyTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, title: trimmed } : t)),
+      );
+      dbUpdateWeeklyTaskTitle(id, trimmed).catch((err) => {
+        console.error(err);
+        notify.error("週任務更新失敗");
+      });
+    },
+    [notify],
+  );
+
+  const disableWeeklyTask = useCallback(
+    (id: string) => {
+      setWeeklyTasks((prev) => prev.filter((t) => t.id !== id));
+      dbSetWeeklyTaskActive(id, false).catch((err) => {
+        console.error(err);
+        notify.error("週任務停用失敗");
+      });
+    },
+    [notify],
+  );
+
+  const reorderWeeklyTasksOp = useCallback(
+    (orderedIds: string[]) => {
+      setWeeklyTasks((prev) => {
+        const positionMap = new Map(orderedIds.map((id, i) => [id, i]));
+        return prev
+          .map((t) =>
+            positionMap.has(t.id)
+              ? { ...t, position: positionMap.get(t.id)! }
+              : t,
+          )
+          .sort((a, b) => a.position - b.position);
+      });
+      dbReorderWeeklyTasks(orderedIds).catch((err) => {
+        console.error(err);
+        notify.error("週任務排序失敗");
+      });
+    },
+    [notify],
+  );
+
+  const loadWeeklyCompletions = useCallback(
+    (weekKey: string) => {
+      if (!user || loadedCompletionsWeeks.current.has(weekKey)) return;
+      loadedCompletionsWeeks.current.add(weekKey);
+      fetchWeeklyTaskCompletions(user.id, weekKey)
+        .then((rows) => {
+          setWeeklyCompletions((prev) => ({
+            ...prev,
+            [weekKey]: new Set(rows.map((r) => r.weeklyTaskId)),
+          }));
+        })
+        .catch((err) => {
+          console.error(err);
+          notify.error("載入週任務完成狀態失敗");
+          loadedCompletionsWeeks.current.delete(weekKey);
+        });
+    },
+    [user, notify],
+  );
+
+  const toggleWeeklyTaskCompletion = useCallback(
+    (id: string, weekKey: string) => {
+      const current = weeklyCompletions[weekKey] ?? new Set<string>();
+      const willComplete = !current.has(id);
+      setWeeklyCompletions((prev) => {
+        const next = new Set(prev[weekKey] ?? []);
+        if (willComplete) next.add(id);
+        else next.delete(id);
+        return { ...prev, [weekKey]: next };
+      });
+      const op = willComplete
+        ? dbAddWeeklyTaskCompletion(id, weekKey)
+        : dbRemoveWeeklyTaskCompletion(id, weekKey);
+      op.catch((err) => {
+        console.error(err);
+        notify.error("週任務狀態更新失敗");
+      });
+    },
+    [weeklyCompletions, notify],
+  );
+
+  const getTaskTimeRanking = useCallback(
+    (weekKey: string, now: Date) => {
+      const weekBlocks = blocks.filter((b) => b.weekPlanId === weekKey);
+      const titleByBlockId = new Map<string, string>();
+      for (const b of weekBlocks) {
+        if (b.title.trim()) titleByBlockId.set(b.id, b.title.trim());
+      }
+      const totals = new Map<string, number>();
+      for (const session of timerSessions) {
+        const title = titleByBlockId.get(session.blockId);
+        if (!title) continue;
+        const seconds = session.endedAt
+          ? Math.max(0, session.durationSeconds ?? 0)
+          : Math.max(
+              0,
+              Math.floor((now.getTime() - session.startedAt.getTime()) / 1000),
+            );
+        totals.set(title, (totals.get(title) ?? 0) + seconds);
+      }
+      return Array.from(totals.entries())
+        .filter(([, seconds]) => seconds > 0)
+        .map(([title, totalSeconds]) => ({ title, totalSeconds }))
+        .sort((a, b) => b.totalSeconds - a.totalSeconds);
+    },
+    [blocks, timerSessions],
+  );
+
   const getElapsedSeconds = useCallback(
     (blockId: string, now: Date): number => {
       const sessions = timerSessions.filter((s) => s.blockId === blockId);
@@ -819,6 +997,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         addManualTimer,
         clearTimer,
         taskTitleSuggestions,
+        weeklyTasks,
+        weeklyCompletions,
+        addWeeklyTask,
+        editWeeklyTask,
+        disableWeeklyTask,
+        reorderWeeklyTasks: reorderWeeklyTasksOp,
+        toggleWeeklyTaskCompletion,
+        loadWeeklyCompletions,
+        getTaskTimeRanking,
       }}
     >
       {children}

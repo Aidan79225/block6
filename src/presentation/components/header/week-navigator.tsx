@@ -21,7 +21,14 @@ export function WeekNavigator({
 }: WeekNavigatorProps) {
   const weekEnd = addDays(weekStart, 6);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        minWidth: 0,
+      }}
+    >
       <button
         onClick={onPreviousWeek}
         aria-label="Previous week"
@@ -31,7 +38,8 @@ export function WeekNavigator({
           color: "var(--color-text-primary)",
           cursor: "pointer",
           fontSize: "18px",
-          padding: "4px 8px",
+          padding: "4px 6px",
+          flexShrink: 0,
         }}
       >
         &larr;
@@ -39,10 +47,10 @@ export function WeekNavigator({
       <span
         style={{
           color: "var(--color-text-primary)",
-          fontSize: "16px",
+          fontSize: "14px",
           fontWeight: 600,
-          minWidth: "140px",
           textAlign: "center",
+          whiteSpace: "nowrap",
         }}
       >
         {formatDate(weekStart)} &ndash; {formatDate(weekEnd)}
@@ -56,7 +64,8 @@ export function WeekNavigator({
           color: "var(--color-text-primary)",
           cursor: "pointer",
           fontSize: "18px",
-          padding: "4px 8px",
+          padding: "4px 6px",
+          flexShrink: 0,
         }}
       >
         &rarr;
