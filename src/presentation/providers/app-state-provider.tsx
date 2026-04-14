@@ -592,9 +592,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       let total = 0;
       for (const s of sessions) {
         if (s.endedAt) {
-          total += s.durationSeconds ?? 0;
+          total += Math.max(0, s.durationSeconds ?? 0);
         } else {
-          total += Math.floor((now.getTime() - s.startedAt.getTime()) / 1000);
+          total += Math.max(
+            0,
+            Math.floor((now.getTime() - s.startedAt.getTime()) / 1000),
+          );
         }
       }
       return total;

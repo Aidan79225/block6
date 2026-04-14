@@ -60,7 +60,7 @@ export default function DashboardPage() {
   const [selected, setSelected] = useState<SelectedCell | null>(null);
   const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
   const [mobileView, setMobileView] = useState<"day" | "overview">("day");
-  const [now, setNow] = useState<Date>(new Date());
+  const [, forceTick] = useState(0);
 
   const weekKey = weekStart.toISOString().split("T")[0];
   const blocks = getBlocksForWeek(weekKey);
@@ -76,10 +76,10 @@ export default function DashboardPage() {
     }
   }, [selected, weekStart, loadDiary]);
 
-  // Tick every second to update elapsed time while a timer is running
+  // Force a re-render every second while a timer is running
   useEffect(() => {
     if (!activeTimer) return;
-    const interval = setInterval(() => setNow(new Date()), 1000);
+    const interval = setInterval(() => forceTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, [activeTimer]);
 
@@ -228,7 +228,9 @@ export default function DashboardPage() {
               selectedBlock ? getSubtasksForBlock(selectedBlock.id) : []
             }
             elapsedSeconds={
-              selectedBlock ? getElapsedSeconds(selectedBlock.id, now) : 0
+              selectedBlock
+                ? getElapsedSeconds(selectedBlock.id, new Date())
+                : 0
             }
             isTimerActive={
               !!(selectedBlock && activeTimer?.blockId === selectedBlock.id)
