@@ -3,8 +3,12 @@ import { BlockType, BlockStatus } from "@/domain/entities/block";
 
 interface BlockCellProps {
   block: Block | null;
+  isSelected?: boolean;
   onClick: () => void;
 }
+
+const SELECTED_OUTLINE = "2px solid var(--color-accent)";
+const SELECTED_OUTLINE_OFFSET = "1px";
 
 const typeColorMap: Record<BlockType, string> = {
   [BlockType.Core]: "var(--color-block-core)",
@@ -20,7 +24,7 @@ const statusIcon: Record<BlockStatus, string> = {
   [BlockStatus.Skipped]: "\u2013",
 };
 
-export function BlockCell({ block, onClick }: BlockCellProps) {
+export function BlockCell({ block, isSelected, onClick }: BlockCellProps) {
   if (!block) {
     return (
       <button
@@ -37,6 +41,8 @@ export function BlockCell({ block, onClick }: BlockCellProps) {
           alignItems: "center",
           justifyContent: "center",
           fontSize: "18px",
+          outline: isSelected ? SELECTED_OUTLINE : "none",
+          outlineOffset: isSelected ? SELECTED_OUTLINE_OFFSET : "0",
         }}
       >
         +
@@ -67,6 +73,8 @@ export function BlockCell({ block, onClick }: BlockCellProps) {
         textAlign: "left",
         fontSize: "12px",
         opacity: block.status === BlockStatus.Skipped ? 0.5 : 1,
+        outline: isSelected ? SELECTED_OUTLINE : "none",
+        outlineOffset: isSelected ? SELECTED_OUTLINE_OFFSET : "0",
       }}
     >
       <span style={{ fontWeight: 500, fontSize: "11px" }}>{block.title}</span>

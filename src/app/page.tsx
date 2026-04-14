@@ -143,13 +143,20 @@ export default function DashboardPage() {
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
           <div className="desktop-only">
-            <WeekGrid blocks={blocks} onBlockClick={handleBlockClick} />
+            <WeekGrid
+              blocks={blocks}
+              selectedDayOfWeek={selected?.dayOfWeek ?? null}
+              selectedSlot={selected?.slot ?? null}
+              onBlockClick={handleBlockClick}
+            />
           </div>
           <div className="mobile-only">
             {mobileView === "day" ? (
               <DayView
                 dayOfWeek={mobileDay}
                 blocks={blocks}
+                selectedDayOfWeek={selected?.dayOfWeek ?? null}
+                selectedSlot={selected?.slot ?? null}
                 onBlockClick={handleBlockClick}
                 onPreviousDay={
                   mobileDay > 1 ? () => setMobileDay((d) => d - 1) : undefined

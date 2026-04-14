@@ -4,8 +4,12 @@ import { BlockType, BlockStatus } from "@/domain/entities/block";
 interface BlockCardProps {
   block: Block | null;
   slot: number;
+  isSelected?: boolean;
   onClick: () => void;
 }
+
+const SELECTED_OUTLINE = "2px solid var(--color-accent)";
+const SELECTED_OUTLINE_OFFSET = "1px";
 
 const typeColorMap: Record<BlockType, string> = {
   [BlockType.Core]: "var(--color-block-core)",
@@ -21,7 +25,12 @@ const statusLabel: Record<BlockStatus, string> = {
   [BlockStatus.Skipped]: "\u2013 跳過",
 };
 
-export function BlockCard({ block, slot, onClick }: BlockCardProps) {
+export function BlockCard({
+  block,
+  slot,
+  isSelected,
+  onClick,
+}: BlockCardProps) {
   if (!block) {
     return (
       <button
@@ -38,6 +47,8 @@ export function BlockCard({ block, slot, onClick }: BlockCardProps) {
           color: "var(--color-text-muted)",
           fontSize: "14px",
           width: "100%",
+          outline: isSelected ? SELECTED_OUTLINE : "none",
+          outlineOffset: isSelected ? SELECTED_OUTLINE_OFFSET : "0",
         }}
       >
         區塊 {slot} — 點擊新增
@@ -63,6 +74,8 @@ export function BlockCard({ block, slot, onClick }: BlockCardProps) {
         width: "100%",
         textAlign: "left",
         opacity: block.status === BlockStatus.Skipped ? 0.5 : 1,
+        outline: isSelected ? SELECTED_OUTLINE : "none",
+        outlineOffset: isSelected ? SELECTED_OUTLINE_OFFSET : "0",
       }}
     >
       <div>
