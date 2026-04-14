@@ -64,8 +64,8 @@ export function SidePanel({
 }: SidePanelProps) {
   return (
     <aside
+      className="side-panel"
       style={{
-        width: "320px",
         background: "var(--color-panel-bg)",
         borderLeft: "1px solid var(--color-border)",
         padding: "16px",

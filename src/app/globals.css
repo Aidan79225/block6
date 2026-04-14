@@ -15,6 +15,7 @@ body {
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
   transition: background-color 0.2s, color 0.2s;
+  overflow-x: hidden;
 }
 
 a {
@@ -27,4 +28,19 @@ a {
 @media (max-width: 768px) {
   .desktop-only { display: none; }
   .mobile-only { display: block; }
+}
+
+/* SidePanel: side drawer on desktop, full-screen overlay on mobile */
+.side-panel {
+  width: 320px;
+  flex-shrink: 0;
+}
+@media (max-width: 768px) {
+  .side-panel {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    z-index: 200;
+    border-left: none !important;
+  }
 }
