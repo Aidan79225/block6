@@ -533,10 +533,7 @@ export async function deleteSessionsForBlock(blockId: string): Promise<void> {
 
 // --- Block position operations ---
 
-export async function swapBlocksInDb(
-  idA: string,
-  idB: string,
-): Promise<void> {
+export async function swapBlocksInDb(idA: string, idB: string): Promise<void> {
   const { error } = await supabase.rpc("swap_blocks", {
     block_a: idA,
     block_b: idB,

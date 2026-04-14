@@ -114,8 +114,7 @@ export function BlockCell({
         justifyContent: "space-between",
         textAlign: "left",
         fontSize: "12px",
-        opacity:
-          isDragging || block.status === BlockStatus.Skipped ? 0.4 : 1,
+        opacity: isDragging || block.status === BlockStatus.Skipped ? 0.4 : 1,
         outline,
         outlineOffset: outline === "none" ? "0" : OUTLINE_OFFSET,
         transform: transform

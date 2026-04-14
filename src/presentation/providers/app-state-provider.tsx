@@ -536,9 +536,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     async (id: string, dayOfWeek: number, slot: number) => {
       setSupaBlocks((prev) =>
         prev.map((block) =>
-          block.id === id
-            ? createBlock({ ...block, dayOfWeek, slot })
-            : block,
+          block.id === id ? createBlock({ ...block, dayOfWeek, slot }) : block,
         ),
       );
       if (user) {
