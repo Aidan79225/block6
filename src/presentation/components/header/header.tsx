@@ -51,7 +51,14 @@ export function Header({
         onPreviousWeek={onPreviousWeek}
         onNextWeek={onNextWeek}
       />
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          flexShrink: 0,
+        }}
+      >
         {userEmail ? (
           <>
             <span

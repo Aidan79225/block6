@@ -13,6 +13,8 @@ import { useTheme } from "@/presentation/hooks/use-theme";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
 import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
+import { useNotify } from "@/presentation/providers/notification-provider";
+import { CopyLastWeekBanner } from "@/presentation/components/dashboard/copy-last-week-banner";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
 
 interface SelectedCell {
@@ -71,13 +73,16 @@ export default function DashboardPage() {
     reorderWeeklyTasks,
     toggleWeeklyTaskCompletion,
     loadWeeklyCompletions,
+    copyPreviousWeekPlan,
   } = useAppState();
+  const notify = useNotify();
   const [selected, setSelected] = useState<SelectedCell | null>(null);
   const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
   const [mobileView, setMobileView] = useState<
     "day" | "overview" | "checklist"
   >("day");
   const [, forceTick] = useState(0);
+  const [isCopying, setIsCopying] = useState(false);
 
   const weekKey = weekStart.toISOString().split("T")[0];
   const blocks = getBlocksForWeek(weekKey);
@@ -110,6 +115,24 @@ export default function DashboardPage() {
   const totalCount = blocks.length;
   const completionPct =
     totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
+
+  const handleCopyLastWeek = async () => {
+    if (isCopying) return;
+    setIsCopying(true);
+    try {
+      const count = await copyPreviousWeekPlan(weekKey);
+      if (count === 0) {
+        notify.info("上週沒有可複製的內容");
+      } else {
+        notify.info(`已複製 ${count} 個區塊`);
+      }
+    } catch (err) {
+      console.error(err);
+      notify.error("複製失敗，請稍後再試");
+    } finally {
+      setIsCopying(false);
+    }
+  };
 
   const handleBlockClick = (dayOfWeek: number, slot: number) => {
     setSelected({ dayOfWeek, slot });
@@ -161,6 +184,13 @@ export default function DashboardPage() {
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
+          {user && blocks.length < 42 && (
+            <CopyLastWeekBanner
+              emptyCellCount={42 - blocks.length}
+              isCopying={isCopying}
+              onCopy={handleCopyLastWeek}
+            />
+          )}
           <div className="desktop-only">
             <WeekGrid
               blocks={blocks}
@@ -390,6 +420,7 @@ export default function DashboardPage() {
             onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
             onDisable={disableWeeklyTask}
             onReorder={reorderWeeklyTasks}
+            rightOffset={selected ? "336px" : "16px"}
           />
         </div>
       )}

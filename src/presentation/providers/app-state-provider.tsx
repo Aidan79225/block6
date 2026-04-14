@@ -62,6 +62,7 @@ interface AppState {
     blockType: BlockType,
   ) => void;
   updateStatus: (blockId: string, status: BlockStatus) => void;
+  copyPreviousWeekPlan: (currentWeekKey: string) => Promise<number>;
   swapBlocks: (idA: string, idB: string) => Promise<void>;
   moveBlock: (id: string, dayOfWeek: number, slot: number) => Promise<void>;
   diaryEntries: Record<string, DiaryLines>;
@@ -563,6 +564,71 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, notify],
   );
 
+  const copyPreviousWeekPlan = useCallback(
+    async (currentWeekKey: string): Promise<number> => {
+      if (!user) return 0;
+
+      const currentDate = new Date(currentWeekKey);
+      const prev = new Date(currentDate);
+      prev.setUTCDate(prev.getUTCDate() - 7);
+      const previousWeekKey = prev.toISOString().split("T")[0];
+
+      const prevBlocks = await fetchBlocksForWeek(user.id, previousWeekKey);
+      if (prevBlocks.length === 0) return 0;
+
+      const prevSubtasks = await fetchSubtasksForBlocks(
+        prevBlocks.map((b) => b.id),
+      );
+      const subtasksByBlock = new Map<string, typeof prevSubtasks>();
+      for (const s of prevSubtasks) {
+        const list = subtasksByBlock.get(s.blockId) ?? [];
+        list.push(s);
+        subtasksByBlock.set(s.blockId, list);
+      }
+
+      const currentBlocks = supaBlocks.filter(
+        (b) => b.weekPlanId === currentWeekKey,
+      );
+      const occupied = new Set(
+        currentBlocks.map((b) => `${b.dayOfWeek}-${b.slot}`),
+      );
+
+      let inserted = 0;
+      for (const prevBlock of prevBlocks) {
+        const key = `${prevBlock.dayOfWeek}-${prevBlock.slot}`;
+        if (occupied.has(key)) continue;
+
+        const saved = await upsertBlock(
+          user.id,
+          currentWeekKey,
+          prevBlock.dayOfWeek,
+          prevBlock.slot,
+          prevBlock.blockType,
+          prevBlock.title,
+          prevBlock.description,
+        );
+
+        const subtasksToCopy = (
+          subtasksByBlock.get(prevBlock.id) ?? []
+        ).slice();
+        subtasksToCopy.sort((a, b) => a.position - b.position);
+        for (let i = 0; i < subtasksToCopy.length; i++) {
+          const st = subtasksToCopy[i];
+          await dbAddSubtask(saved.id, st.title, i);
+        }
+
+        inserted++;
+      }
+
+      // Force re-fetch of this week's data
+      loadedWeeks.current.delete(currentWeekKey);
+      loadWeek(currentWeekKey);
+
+      return inserted;
+    },
+    [user, supaBlocks, loadWeek],
+  );
+
   const swapBlocks = useCallback(
     async (idA: string, idB: string) => {
       setSupaBlocks((prev) => {
@@ -992,6 +1058,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         getBlocksForWeek,
         saveBlock,
         updateStatus,
+        copyPreviousWeekPlan,
         swapBlocks,
         moveBlock,
         diaryEntries,
