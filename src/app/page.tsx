@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Header } from "@/presentation/components/header/header";
 import { WeekGrid } from "@/presentation/components/week-grid/week-grid";
 import { SidePanel } from "@/presentation/components/side-panel/side-panel";
 import { DayView } from "@/presentation/components/day-view/day-view";
 import { WeekOverview } from "@/presentation/components/week-overview/week-overview";
+import { FloatingChecklistButton } from "@/presentation/components/checklist/floating-checklist-button";
+import { WeeklyChecklistPanel } from "@/presentation/components/checklist/weekly-checklist-panel";
 import { useTheme } from "@/presentation/hooks/use-theme";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
 import { useAppState } from "@/presentation/providers/app-state-provider";
@@ -60,10 +63,20 @@ export default function DashboardPage() {
     stopTimer,
     addManualTimer,
     clearTimer,
+    weeklyTasks,
+    weeklyCompletions,
+    addWeeklyTask,
+    editWeeklyTask,
+    disableWeeklyTask,
+    reorderWeeklyTasks,
+    toggleWeeklyTaskCompletion,
+    loadWeeklyCompletions,
   } = useAppState();
   const [selected, setSelected] = useState<SelectedCell | null>(null);
   const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
-  const [mobileView, setMobileView] = useState<"day" | "overview">("day");
+  const [mobileView, setMobileView] = useState<
+    "day" | "overview" | "checklist"
+  >("day");
   const [, forceTick] = useState(0);
 
   const weekKey = weekStart.toISOString().split("T")[0];
@@ -72,6 +85,10 @@ export default function DashboardPage() {
   useEffect(() => {
     loadWeek(weekKey);
   }, [weekKey, loadWeek]);
+
+  useEffect(() => {
+    loadWeeklyCompletions(weekKey);
+  }, [weekKey, loadWeeklyCompletions]);
 
   useEffect(() => {
     if (selected) {
@@ -155,7 +172,7 @@ export default function DashboardPage() {
             />
           </div>
           <div className="mobile-only">
-            {mobileView === "day" ? (
+            {mobileView === "day" && (
               <DayView
                 dayOfWeek={mobileDay}
                 blocks={blocks}
@@ -169,13 +186,25 @@ export default function DashboardPage() {
                   mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
                 }
               />
-            ) : (
+            )}
+            {mobileView === "overview" && (
               <WeekOverview
                 blocks={blocks}
                 onDayClick={(day) => {
                   setMobileDay(day);
                   setMobileView("day");
                 }}
+              />
+            )}
+            {mobileView === "checklist" && user && (
+              <WeeklyChecklistPanel
+                tasks={weeklyTasks}
+                completedIds={weeklyCompletions[weekKey] ?? new Set()}
+                onAdd={addWeeklyTask}
+                onEdit={editWeeklyTask}
+                onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
+                onDisable={disableWeeklyTask}
+                onReorder={reorderWeeklyTasks}
               />
             )}
             <div
@@ -218,6 +247,23 @@ export default function DashboardPage() {
               >
                 今日
               </button>
+              {user && (
+                <button
+                  onClick={() => setMobileView("checklist")}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color:
+                      mobileView === "checklist"
+                        ? "var(--color-accent)"
+                        : "var(--color-text-secondary)",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  清單
+                </button>
+              )}
               <a
                 href="/review"
                 style={{
@@ -321,7 +367,31 @@ export default function DashboardPage() {
               }}
             />
           </div>
+          <Link
+            href="/review"
+            style={{
+              color: "var(--color-accent)",
+              fontSize: "13px",
+              whiteSpace: "nowrap",
+              marginLeft: "12px",
+            }}
+          >
+            查看詳細回顧 &rarr;
+          </Link>
         </footer>
+      )}
+      {user && (
+        <div className="desktop-only">
+          <FloatingChecklistButton
+            tasks={weeklyTasks}
+            completedIds={weeklyCompletions[weekKey] ?? new Set()}
+            onAdd={addWeeklyTask}
+            onEdit={editWeeklyTask}
+            onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
+            onDisable={disableWeeklyTask}
+            onReorder={reorderWeeklyTasks}
+          />
+        </div>
       )}
     </div>
   );
