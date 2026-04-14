@@ -13,6 +13,7 @@ import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import { useAuth } from "./auth-provider";
 import { useNotify } from "./notification-provider";
+import type { Subtask } from "@/domain/entities/subtask";
 import {
   fetchBlocksForWeek,
   upsertBlock,
@@ -20,6 +21,11 @@ import {
   fetchDiary,
   upsertDiary,
   fetchReflection,
+  fetchSubtasksForBlocks,
+  addSubtask as dbAddSubtask,
+  toggleSubtaskCompleted as dbToggleSubtask,
+  deleteSubtask as dbDeleteSubtask,
+  reorderSubtasks as dbReorderSubtasks,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 
@@ -48,6 +54,12 @@ interface AppState {
   loadWeek: (weekKey: string) => void;
   loadDiary: (dateKey: string) => void;
   loadReflection: (weekKey: string) => void;
+  subtasks: Subtask[];
+  getSubtasksForBlock: (blockId: string) => Subtask[];
+  addSubtask: (blockId: string, title: string) => void;
+  toggleSubtask: (id: string) => void;
+  deleteSubtask: (id: string) => void;
+  reorderSubtasks: (blockId: string, orderedIds: string[]) => void;
 }
 
 // --- localStorage helpers ---
@@ -210,6 +222,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [supaBlocks, setSupaBlocks] = useState<Block[]>([]);
   const [supaDiary, setSupaDiary] = useState<Record<string, DiaryLines>>({});
   const [supaReflection, setSupaReflection] = useState("");
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
 
   const loadedWeeks = useRef<Set<string>>(new Set());
   const migrationDone = useRef(false);
@@ -247,13 +260,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (!user || loadedWeeks.current.has(weekKey)) return;
       loadedWeeks.current.add(weekKey);
       fetchBlocksForWeek(user.id, weekKey)
-        .then((fetched) => {
+        .then(async (fetched) => {
           setSupaBlocks((prev) => {
             const withoutThisWeek = prev.filter(
               (b) => b.weekPlanId !== weekKey,
             );
             return [...withoutThisWeek, ...fetched];
           });
+          if (fetched.length > 0) {
+            const ids = fetched.map((b) => b.id);
+            const fetchedSubs = await fetchSubtasksForBlocks(ids);
+            const blockIdSet = new Set(ids);
+            setSubtasks((prev) => {
+              const other = prev.filter((s) => !blockIdSet.has(s.blockId));
+              return [...other, ...fetchedSubs];
+            });
+          }
         })
         .catch((err) => {
           console.error(err);
@@ -454,6 +476,79 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const getSubtasksForBlock = useCallback(
+    (blockId: string): Subtask[] => {
+      return subtasks
+        .filter((s) => s.blockId === blockId)
+        .sort((a, b) => a.position - b.position);
+    },
+    [subtasks],
+  );
+
+  const addSubtask = useCallback(
+    (blockId: string, title: string) => {
+      if (!user) return;
+      const existing = subtasks.filter((s) => s.blockId === blockId);
+      const position =
+        existing.length === 0
+          ? 0
+          : Math.max(...existing.map((s) => s.position)) + 1;
+      dbAddSubtask(blockId, title, position)
+        .then((created) => setSubtasks((prev) => [...prev, created]))
+        .catch((err) => {
+          console.error(err);
+          notify.error("細項新增失敗");
+        });
+    },
+    [user, subtasks, notify],
+  );
+
+  const toggleSubtask = useCallback(
+    (id: string) => {
+      const target = subtasks.find((s) => s.id === id);
+      if (!target) return;
+      const newCompleted = !target.completed;
+      setSubtasks((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, completed: newCompleted } : s)),
+      );
+      dbToggleSubtask(id, newCompleted).catch((err) => {
+        console.error(err);
+        notify.error("細項更新失敗");
+      });
+    },
+    [subtasks, notify],
+  );
+
+  const deleteSubtask = useCallback(
+    (id: string) => {
+      setSubtasks((prev) => prev.filter((s) => s.id !== id));
+      dbDeleteSubtask(id).catch((err) => {
+        console.error(err);
+        notify.error("細項刪除失敗");
+      });
+    },
+    [notify],
+  );
+
+  const reorderSubtasks = useCallback(
+    (_blockId: string, orderedIds: string[]) => {
+      // Optimistic update: renumber locally
+      setSubtasks((prev) => {
+        const positionMap = new Map(orderedIds.map((id, i) => [id, i]));
+        return prev.map((s) =>
+          positionMap.has(s.id)
+            ? { ...s, position: positionMap.get(s.id)! }
+            : s,
+        );
+      });
+      dbReorderSubtasks(orderedIds).catch((err) => {
+        console.error(err);
+        notify.error("細項排序失敗");
+      });
+    },
+    [notify],
+  );
+
   return (
     <AppStateContext.Provider
       value={{
@@ -469,6 +564,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         loadWeek,
         loadDiary,
         loadReflection,
+        subtasks,
+        getSubtasksForBlock,
+        addSubtask,
+        toggleSubtask,
+        deleteSubtask,
+        reorderSubtasks,
       }}
     >
       {children}
