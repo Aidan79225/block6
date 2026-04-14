@@ -12,9 +12,13 @@ interface Props {
   onToggle: (id: string) => void;
   onDisable: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
+  rightOffset?: string;
 }
 
-export function FloatingChecklistButton(props: Props) {
+export function FloatingChecklistButton({
+  rightOffset = "16px",
+  ...props
+}: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -35,8 +39,9 @@ export function FloatingChecklistButton(props: Props) {
       style={{
         position: "fixed",
         bottom: "72px",
-        right: "16px",
+        right: rightOffset,
         zIndex: 100,
+        transition: "right 0.2s",
       }}
     >
       {open && (

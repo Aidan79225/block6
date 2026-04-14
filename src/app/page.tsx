@@ -420,6 +420,7 @@ export default function DashboardPage() {
             onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
             onDisable={disableWeeklyTask}
             onReorder={reorderWeeklyTasks}
+            rightOffset={selected ? "336px" : "16px"}
           />
         </div>
       )}
