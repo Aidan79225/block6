@@ -3,6 +3,8 @@ import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import type { Subtask } from "@/domain/entities/subtask";
 import { createSubtask } from "@/domain/entities/subtask";
+import type { TimerSession } from "@/domain/entities/timer-session";
+import { createTimerSession } from "@/domain/entities/timer-session";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
@@ -376,4 +378,129 @@ export async function reorderSubtasks(
       .eq("id", orderedIds[i]);
     if (error) throw new Error(error.message);
   }
+}
+
+// --- Timer Sessions ---
+
+interface DbTimerSession {
+  id: string;
+  block_id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number | null;
+}
+
+function dbTimerSessionToEntity(db: DbTimerSession): TimerSession {
+  return createTimerSession({
+    id: db.id,
+    blockId: db.block_id,
+    userId: db.user_id,
+    startedAt: new Date(db.started_at),
+    endedAt: db.ended_at ? new Date(db.ended_at) : null,
+    durationSeconds: db.duration_seconds,
+  });
+}
+
+export async function fetchTimerSessionsForBlocks(
+  blockIds: string[],
+): Promise<TimerSession[]> {
+  if (blockIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("timer_sessions")
+    .select("*")
+    .in("block_id", blockIds);
+
+  if (error) throw new Error(error.message);
+  return (data as DbTimerSession[]).map(dbTimerSessionToEntity);
+}
+
+export async function fetchActiveSession(
+  userId: string,
+): Promise<TimerSession | null> {
+  const { data, error } = await supabase
+    .from("timer_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .is("ended_at", null)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbTimerSessionToEntity(data as DbTimerSession);
+}
+
+export async function stopActiveSession(userId: string): Promise<void> {
+  const { data: active, error: findErr } = await supabase
+    .from("timer_sessions")
+    .select("id, started_at")
+    .eq("user_id", userId)
+    .is("ended_at", null)
+    .maybeSingle();
+
+  if (findErr) throw new Error(findErr.message);
+  if (!active) return;
+
+  const startedAt = new Date(active.started_at);
+  const endedAt = new Date();
+  const durationSeconds = Math.floor(
+    (endedAt.getTime() - startedAt.getTime()) / 1000,
+  );
+
+  const { error } = await supabase
+    .from("timer_sessions")
+    .update({
+      ended_at: endedAt.toISOString(),
+      duration_seconds: durationSeconds,
+    })
+    .eq("id", active.id);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function startTimerForBlock(
+  userId: string,
+  blockId: string,
+): Promise<TimerSession> {
+  // Stop any existing active session first
+  await stopActiveSession(userId);
+
+  const { data, error } = await supabase
+    .from("timer_sessions")
+    .insert({
+      block_id: blockId,
+      user_id: userId,
+      started_at: new Date().toISOString(),
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return dbTimerSessionToEntity(data as DbTimerSession);
+}
+
+export async function addManualSession(
+  userId: string,
+  blockId: string,
+  startedAt: Date,
+  endedAt: Date,
+): Promise<TimerSession> {
+  const durationSeconds = Math.floor(
+    (endedAt.getTime() - startedAt.getTime()) / 1000,
+  );
+
+  const { data, error } = await supabase
+    .from("timer_sessions")
+    .insert({
+      block_id: blockId,
+      user_id: userId,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt.toISOString(),
+      duration_seconds: durationSeconds,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return dbTimerSessionToEntity(data as DbTimerSession);
 }
