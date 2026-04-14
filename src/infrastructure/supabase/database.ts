@@ -1,6 +1,8 @@
 import { supabase } from "./client";
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
+import type { Subtask } from "@/domain/entities/subtask";
+import { createSubtask } from "@/domain/entities/subtask";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
@@ -283,6 +285,95 @@ export async function upsertReflection(
     const { error } = await supabase
       .from("week_reviews")
       .insert({ week_plan_id: weekPlanId, reflection });
+    if (error) throw new Error(error.message);
+  }
+}
+
+// --- Subtasks ---
+
+interface DbSubtask {
+  id: string;
+  block_id: string;
+  title: string;
+  completed: boolean;
+  position: number;
+  created_at: string;
+}
+
+function dbSubtaskToEntity(db: DbSubtask): Subtask {
+  return createSubtask({
+    id: db.id,
+    blockId: db.block_id,
+    title: db.title,
+    completed: db.completed,
+    position: db.position,
+    createdAt: new Date(db.created_at),
+  });
+}
+
+export async function fetchSubtasksForBlocks(
+  blockIds: string[],
+): Promise<Subtask[]> {
+  if (blockIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("subtasks")
+    .select("*")
+    .in("block_id", blockIds)
+    .order("position", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data as DbSubtask[]).map(dbSubtaskToEntity);
+}
+
+export async function addSubtask(
+  blockId: string,
+  title: string,
+  position: number,
+): Promise<Subtask> {
+  const { data, error } = await supabase
+    .from("subtasks")
+    .insert({ block_id: blockId, title, position })
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return dbSubtaskToEntity(data as DbSubtask);
+}
+
+export async function toggleSubtaskCompleted(
+  id: string,
+  completed: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from("subtasks")
+    .update({ completed })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteSubtask(id: string): Promise<void> {
+  const { error } = await supabase.from("subtasks").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function reorderSubtasks(
+  orderedIds: string[],
+): Promise<void> {
+  const OFFSET = 10000;
+  // Phase 1: move to high temporary positions to avoid UNIQUE(block_id, position) collisions
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("subtasks")
+      .update({ position: OFFSET + i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
+  // Phase 2: set final positions 0..N-1
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("subtasks")
+      .update({ position: i })
+      .eq("id", orderedIds[i]);
     if (error) throw new Error(error.message);
   }
 }
