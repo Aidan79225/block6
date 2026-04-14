@@ -14,6 +14,7 @@ import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import { useAuth } from "./auth-provider";
 import { useNotify } from "./notification-provider";
 import type { Subtask } from "@/domain/entities/subtask";
+import type { TimerSession } from "@/domain/entities/timer-session";
 import {
   fetchBlocksForWeek,
   upsertBlock,
@@ -26,6 +27,11 @@ import {
   toggleSubtaskCompleted as dbToggleSubtask,
   deleteSubtask as dbDeleteSubtask,
   reorderSubtasks as dbReorderSubtasks,
+  fetchTimerSessionsForBlocks,
+  fetchActiveSession,
+  startTimerForBlock,
+  stopActiveSession,
+  addManualSession as dbAddManualSession,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 
@@ -60,6 +66,16 @@ interface AppState {
   toggleSubtask: (id: string) => void;
   deleteSubtask: (id: string) => void;
   reorderSubtasks: (blockId: string, orderedIds: string[]) => void;
+  timerSessions: TimerSession[];
+  activeTimer: TimerSession | null;
+  getElapsedSeconds: (blockId: string, now: Date) => number;
+  startTimer: (blockId: string) => Promise<void>;
+  stopTimer: () => Promise<void>;
+  addManualTimer: (
+    blockId: string,
+    startedAt: Date,
+    endedAt: Date,
+  ) => Promise<void>;
 }
 
 // --- localStorage helpers ---
@@ -223,6 +239,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [supaDiary, setSupaDiary] = useState<Record<string, DiaryLines>>({});
   const [supaReflection, setSupaReflection] = useState("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [timerSessions, setTimerSessions] = useState<TimerSession[]>([]);
+  const [activeTimer, setActiveTimer] = useState<TimerSession | null>(null);
 
   const loadedWeeks = useRef<Set<string>>(new Set());
   const migrationDone = useRef(false);
@@ -254,6 +272,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isLoggedIn, user, notify]);
 
+  useEffect(() => {
+    const promise = isLoggedIn
+      ? fetchActiveSession(user!.id)
+      : Promise.resolve(null);
+    promise
+      .then((active) => setActiveTimer(active))
+      .catch((err) => {
+        console.error(err);
+        notify.error("載入計時器狀態失敗");
+      });
+  }, [isLoggedIn, user, notify]);
+
   // Load a week's blocks from Supabase
   const loadWeek = useCallback(
     (weekKey: string) => {
@@ -269,11 +299,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           });
           if (fetched.length > 0) {
             const ids = fetched.map((b) => b.id);
-            const fetchedSubs = await fetchSubtasksForBlocks(ids);
+            const [fetchedSubs, fetchedSessions] = await Promise.all([
+              fetchSubtasksForBlocks(ids),
+              fetchTimerSessionsForBlocks(ids),
+            ]);
             const blockIdSet = new Set(ids);
             setSubtasks((prev) => {
               const other = prev.filter((s) => !blockIdSet.has(s.blockId));
               return [...other, ...fetchedSubs];
+            });
+            setTimerSessions((prev) => {
+              const other = prev.filter((s) => !blockIdSet.has(s.blockId));
+              return [...other, ...fetchedSessions];
             });
           }
         })
@@ -549,6 +586,96 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [notify],
   );
 
+  const getElapsedSeconds = useCallback(
+    (blockId: string, now: Date): number => {
+      const sessions = timerSessions.filter((s) => s.blockId === blockId);
+      let total = 0;
+      for (const s of sessions) {
+        if (s.endedAt) {
+          total += s.durationSeconds ?? 0;
+        } else {
+          total += Math.floor(
+            (now.getTime() - s.startedAt.getTime()) / 1000,
+          );
+        }
+      }
+      return total;
+    },
+    [timerSessions],
+  );
+
+  const startTimer = useCallback(
+    async (blockId: string) => {
+      if (!user) return;
+      try {
+        if (activeTimer) {
+          const nowDate = new Date();
+          const duration = Math.floor(
+            (nowDate.getTime() - activeTimer.startedAt.getTime()) / 1000,
+          );
+          setTimerSessions((prev) =>
+            prev.map((s) =>
+              s.id === activeTimer.id
+                ? { ...s, endedAt: nowDate, durationSeconds: duration }
+                : s,
+            ),
+          );
+        }
+        const newSession = await startTimerForBlock(user.id, blockId);
+        setActiveTimer(newSession);
+        setTimerSessions((prev) => {
+          const existing = prev.find((s) => s.id === newSession.id);
+          return existing ? prev : [...prev, newSession];
+        });
+      } catch (err) {
+        console.error(err);
+        notify.error("計時器啟動失敗");
+      }
+    },
+    [user, activeTimer, notify],
+  );
+
+  const stopTimer = useCallback(async () => {
+    if (!user || !activeTimer) return;
+    try {
+      await stopActiveSession(user.id);
+      const nowDate = new Date();
+      const duration = Math.floor(
+        (nowDate.getTime() - activeTimer.startedAt.getTime()) / 1000,
+      );
+      setTimerSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeTimer.id
+            ? { ...s, endedAt: nowDate, durationSeconds: duration }
+            : s,
+        ),
+      );
+      setActiveTimer(null);
+    } catch (err) {
+      console.error(err);
+      notify.error("計時器停止失敗");
+    }
+  }, [user, activeTimer, notify]);
+
+  const addManualTimer = useCallback(
+    async (blockId: string, startedAt: Date, endedAt: Date) => {
+      if (!user) return;
+      try {
+        const created = await dbAddManualSession(
+          user.id,
+          blockId,
+          startedAt,
+          endedAt,
+        );
+        setTimerSessions((prev) => [...prev, created]);
+      } catch (err) {
+        console.error(err);
+        notify.error("手動新增時段失敗");
+      }
+    },
+    [user, notify],
+  );
+
   return (
     <AppStateContext.Provider
       value={{
@@ -570,6 +697,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         toggleSubtask,
         deleteSubtask,
         reorderSubtasks,
+        timerSessions,
+        activeTimer,
+        getElapsedSeconds,
+        startTimer,
+        stopTimer,
+        addManualTimer,
       }}
     >
       {children}
