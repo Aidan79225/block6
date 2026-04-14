@@ -8,7 +8,9 @@ import {
   useEffect,
   useRef,
   useSyncExternalStore,
+  useMemo,
 } from "react";
+import type { TitleSuggestion } from "@/presentation/components/side-panel/task-title-autocomplete";
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import { useAuth } from "./auth-provider";
@@ -80,6 +82,7 @@ interface AppState {
     endedAt: Date,
   ) => Promise<void>;
   clearTimer: (blockId: string) => Promise<void>;
+  taskTitleSuggestions: TitleSuggestion[];
 }
 
 // --- localStorage helpers ---
@@ -255,6 +258,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const blocks = isLoggedIn ? supaBlocks : localData.blocks;
   const diaryEntries = isLoggedIn ? supaDiary : localData.diaryEntries;
   const reflection = isLoggedIn ? supaReflection : localData.reflection;
+
+  const taskTitleSuggestions = useMemo<TitleSuggestion[]>(() => {
+    const counts = new Map<string, number>();
+    for (const b of blocks) {
+      const title = b.title.trim();
+      if (!title) continue;
+      counts.set(title, (counts.get(title) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([title, count]) => ({ title, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [blocks]);
 
   // Migrate local data to Supabase on first login
   useEffect(() => {
@@ -742,6 +757,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         stopTimer,
         addManualTimer,
         clearTimer,
+        taskTitleSuggestions,
       }}
     >
       {children}

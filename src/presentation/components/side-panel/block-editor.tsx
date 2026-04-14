@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { BlockType } from "@/domain/entities/block";
+import { TaskTitleAutocomplete } from "./task-title-autocomplete";
+import { useAppState } from "@/presentation/providers/app-state-provider";
 
 interface BlockEditorProps {
   title: string;
@@ -33,6 +35,7 @@ export function BlockEditor({
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [blockType, setBlockType] = useState(initialType);
+  const { taskTitleSuggestions } = useAppState();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -65,19 +68,10 @@ export function BlockEditor({
           </button>
         ))}
       </div>
-      <input
-        type="text"
+      <TaskTitleAutocomplete
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="任務名稱"
-        style={{
-          background: "var(--color-bg-tertiary)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-sm)",
-          color: "var(--color-text-primary)",
-          padding: "8px",
-          fontSize: "14px",
-        }}
+        suggestions={taskTitleSuggestions}
+        onChange={setTitle}
       />
       <textarea
         value={description}
