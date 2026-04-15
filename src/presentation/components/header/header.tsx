@@ -40,7 +40,7 @@ export function Header({
       <button
         type="button"
         onClick={onTitleClick}
-        aria-label="About The Block 6"
+        aria-label="The Block 6"
         style={{
           fontSize: "18px",
           fontWeight: 700,
@@ -51,7 +51,7 @@ export function Header({
           border: "none",
           padding: 0,
           cursor: "pointer",
-          font: "inherit",
+          fontFamily: "inherit",
         }}
       >
         The Block 6
