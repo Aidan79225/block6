@@ -17,10 +17,9 @@ import { useNotify } from "@/presentation/providers/notification-provider";
 import { CopyLastWeekBanner } from "@/presentation/components/dashboard/copy-last-week-banner";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
 
-interface SelectedCell {
-  dayOfWeek: number;
-  slot: number;
-}
+type Selection =
+  | { kind: "block"; blockId: string }
+  | { kind: "empty"; dayOfWeek: number; slot: number };
 
 function formatDateKey(weekStart: Date, dayOfWeek: number): string {
   const d = new Date(weekStart);
@@ -76,7 +75,7 @@ export default function DashboardPage() {
     copyPreviousWeekPlan,
   } = useAppState();
   const notify = useNotify();
-  const [selected, setSelected] = useState<SelectedCell | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
   const [mobileDay, setMobileDay] = useState<number>(new Date().getDay() || 7);
   const [mobileView, setMobileView] = useState<
     "day" | "overview" | "checklist"
@@ -95,19 +94,43 @@ export default function DashboardPage() {
     loadWeeklyCompletions(weekKey);
   }, [weekKey, loadWeeklyCompletions]);
 
-  useEffect(() => {
-    if (selected) {
-      const dateKey = formatDateKey(weekStart, selected.dayOfWeek);
-      loadDiary(dateKey);
-    }
-  }, [selected, weekStart, loadDiary]);
-
   // Force a re-render every second while a timer is running
   useEffect(() => {
     if (!activeTimer) return;
     const interval = setInterval(() => forceTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, [activeTimer]);
+
+  const selectedBlock =
+    selection?.kind === "block"
+      ? (blocks.find((b) => b.id === selection.blockId) ?? null)
+      : null;
+
+  const selectedDayOfWeek =
+    selection?.kind === "block"
+      ? (selectedBlock?.dayOfWeek ?? null)
+      : (selection?.dayOfWeek ?? null);
+
+  const selectedSlot =
+    selection?.kind === "block"
+      ? (selectedBlock?.slot ?? null)
+      : (selection?.slot ?? null);
+
+  useEffect(() => {
+    if (selectedDayOfWeek != null) {
+      const dateKey = formatDateKey(weekStart, selectedDayOfWeek);
+      loadDiary(dateKey);
+    }
+  }, [selectedDayOfWeek, weekStart, loadDiary]);
+
+  useEffect(() => {
+    if (
+      selection?.kind === "block" &&
+      !blocks.find((b) => b.id === selection.blockId)
+    ) {
+      setSelection(null);
+    }
+  }, [selection, blocks]);
 
   const completedCount = blocks.filter(
     (b) => b.status === BlockStatus.Completed,
@@ -135,29 +158,35 @@ export default function DashboardPage() {
   };
 
   const handleBlockClick = (dayOfWeek: number, slot: number) => {
-    setSelected({ dayOfWeek, slot });
+    const block = blocks.find(
+      (b) => b.dayOfWeek === dayOfWeek && b.slot === slot,
+    );
+    if (block) {
+      setSelection({ kind: "block", blockId: block.id });
+    } else {
+      setSelection({ kind: "empty", dayOfWeek, slot });
+    }
   };
-
-  const selectedBlock = selected
-    ? (blocks.find(
-        (b) => b.dayOfWeek === selected.dayOfWeek && b.slot === selected.slot,
-      ) ?? null)
-    : null;
 
   const handleSaveBlock = (
     title: string,
     description: string,
     blockType: BlockType,
   ) => {
-    if (!selected) return;
-    saveBlock(
-      weekKey,
-      selected.dayOfWeek,
-      selected.slot,
-      title,
-      description,
-      blockType,
-    );
+    if (!selection) return;
+    const day =
+      selection.kind === "block"
+        ? selectedBlock?.dayOfWeek
+        : selection.dayOfWeek;
+    const slot =
+      selection.kind === "block" ? selectedBlock?.slot : selection.slot;
+    if (day == null || slot == null) return;
+
+    const saved = saveBlock(weekKey, day, slot, title, description, blockType);
+
+    if (selection.kind === "empty") {
+      setSelection({ kind: "block", blockId: saved.id });
+    }
   };
 
   const handleStatusChange = (status: BlockStatus) => {
@@ -166,8 +195,8 @@ export default function DashboardPage() {
   };
 
   const handleSaveDiary = (bad: string, good: string, next: string) => {
-    if (!selected) return;
-    const dateKey = formatDateKey(weekStart, selected.dayOfWeek);
+    if (selectedDayOfWeek == null) return;
+    const dateKey = formatDateKey(weekStart, selectedDayOfWeek);
     saveDiary(dateKey, bad, good, next);
   };
 
@@ -194,8 +223,8 @@ export default function DashboardPage() {
           <div className="desktop-only">
             <WeekGrid
               blocks={blocks}
-              selectedDayOfWeek={selected?.dayOfWeek ?? null}
-              selectedSlot={selected?.slot ?? null}
+              selectedDayOfWeek={selectedDayOfWeek}
+              selectedSlot={selectedSlot}
               onBlockClick={handleBlockClick}
               onSwapBlocks={swapBlocks}
               onMoveBlock={moveBlock}
@@ -206,8 +235,8 @@ export default function DashboardPage() {
               <DayView
                 dayOfWeek={mobileDay}
                 blocks={blocks}
-                selectedDayOfWeek={selected?.dayOfWeek ?? null}
-                selectedSlot={selected?.slot ?? null}
+                selectedDayOfWeek={selectedDayOfWeek}
+                selectedSlot={selectedSlot}
                 onBlockClick={handleBlockClick}
                 onPreviousDay={
                   mobileDay > 1 ? () => setMobileDay((d) => d - 1) : undefined
@@ -306,13 +335,13 @@ export default function DashboardPage() {
             </div>
           </div>
         </main>
-        {selected && (
+        {selection && selectedDayOfWeek != null && selectedSlot != null && (
           <SidePanel
-            dayOfWeek={selected.dayOfWeek}
-            slot={selected.slot}
+            dayOfWeek={selectedDayOfWeek}
+            slot={selectedSlot}
             block={selectedBlock}
-            diaryLines={getDiary(formatDateKey(weekStart, selected.dayOfWeek))}
-            isToday={isTodayInWeek(weekStart, selected.dayOfWeek)}
+            diaryLines={getDiary(formatDateKey(weekStart, selectedDayOfWeek))}
+            isToday={isTodayInWeek(weekStart, selectedDayOfWeek)}
             subtasks={
               selectedBlock ? getSubtasksForBlock(selectedBlock.id) : []
             }
@@ -353,7 +382,7 @@ export default function DashboardPage() {
             onClearTimer={() => {
               if (selectedBlock) clearTimer(selectedBlock.id);
             }}
-            onClose={() => setSelected(null)}
+            onClose={() => setSelection(null)}
           />
         )}
       </div>
@@ -420,7 +449,7 @@ export default function DashboardPage() {
             onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
             onDisable={disableWeeklyTask}
             onReorder={reorderWeeklyTasks}
-            rightOffset={selected ? "336px" : "16px"}
+            rightOffset={selection ? "336px" : "16px"}
           />
         </div>
       )}
