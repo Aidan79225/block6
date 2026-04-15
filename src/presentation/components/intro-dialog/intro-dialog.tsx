@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface IntroDialogProps {
   open: boolean;
@@ -15,12 +15,15 @@ const TYPE_ROWS: { color: string; label: string; desc: string }[] = [
 ];
 
 export function IntroDialog({ open, onClose }: IntroDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
+    dialogRef.current?.focus();
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
@@ -42,6 +45,8 @@ export function IntroDialog({ open, onClose }: IntroDialogProps) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="intro-dialog-title"
@@ -49,7 +54,7 @@ export function IntroDialog({ open, onClose }: IntroDialogProps) {
           background: "var(--color-bg-secondary)",
           color: "var(--color-text-primary)",
           border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-lg, 12px)",
+          borderRadius: "var(--radius-lg)",
           padding: "24px",
           maxWidth: "480px",
           width: "100%",
@@ -124,7 +129,7 @@ export function IntroDialog({ open, onClose }: IntroDialogProps) {
               background: "var(--color-accent)",
               color: "var(--color-bg-primary)",
               border: "none",
-              borderRadius: "var(--radius-md, 8px)",
+              borderRadius: "var(--radius-md)",
               padding: "8px 20px",
               fontSize: "14px",
               fontWeight: 600,
