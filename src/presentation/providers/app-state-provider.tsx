@@ -60,7 +60,7 @@ interface AppState {
     title: string,
     description: string,
     blockType: BlockType,
-  ) => void;
+  ) => Block;
   updateStatus: (blockId: string, status: BlockStatus) => void;
   copyPreviousWeekPlan: (currentWeekKey: string) => Promise<number>;
   swapBlocks: (idA: string, idB: string) => Promise<void>;
@@ -451,7 +451,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       title: string,
       description: string,
       blockType: BlockType,
-    ) => {
+    ): Block => {
       const newBlockData = {
         weekPlanId: weekKey,
         dayOfWeek,
@@ -462,7 +462,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       };
 
       if (user) {
-        // Optimistic update to Supabase state
+        let resultBlock: Block | null = null;
         setSupaBlocks((prev) => {
           const existing = prev.find(
             (b) =>
@@ -471,20 +471,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
               b.slot === slot,
           );
           if (existing) {
-            return prev.map((b) =>
-              b.id === existing.id
-                ? createBlock({ ...b, title, description, blockType })
-                : b,
-            );
+            const updated = createBlock({
+              ...existing,
+              title,
+              description,
+              blockType,
+            });
+            resultBlock = updated;
+            return prev.map((b) => (b.id === existing.id ? updated : b));
           }
-          return [
-            ...prev,
-            createBlock({
-              id: crypto.randomUUID(),
-              ...newBlockData,
-              status: BlockStatus.Planned,
-            }),
-          ];
+          const created = createBlock({
+            id: crypto.randomUUID(),
+            ...newBlockData,
+            status: BlockStatus.Planned,
+          });
+          resultBlock = created;
+          return [...prev, created];
         });
 
         upsertBlock(
@@ -511,8 +513,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             console.error(err);
             notify.error("區塊儲存失敗");
           });
+
+        return resultBlock!;
       } else {
-        // Local mode: update localStorage directly
         const current = loadFromStorage();
         const existing = current.blocks.find(
           (b) =>
@@ -520,22 +523,27 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             b.dayOfWeek === dayOfWeek &&
             b.slot === slot,
         );
+        let resultBlock: Block;
         if (existing) {
+          resultBlock = createBlock({
+            ...existing,
+            title,
+            description,
+            blockType,
+          });
           current.blocks = current.blocks.map((b) =>
-            b.id === existing.id
-              ? createBlock({ ...b, title, description, blockType })
-              : b,
+            b.id === existing.id ? resultBlock : b,
           );
         } else {
-          current.blocks.push(
-            createBlock({
-              id: crypto.randomUUID(),
-              ...newBlockData,
-              status: BlockStatus.Planned,
-            }),
-          );
+          resultBlock = createBlock({
+            id: crypto.randomUUID(),
+            ...newBlockData,
+            status: BlockStatus.Planned,
+          });
+          current.blocks.push(resultBlock);
         }
         saveToStorage(current);
+        return resultBlock;
       }
     },
     [user, notify],
