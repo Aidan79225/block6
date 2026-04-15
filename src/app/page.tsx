@@ -27,14 +27,24 @@ function formatDateKey(weekStart: Date, dayOfWeek: number): string {
   return d.toISOString().split("T")[0];
 }
 
-function isTodayInWeek(weekStart: Date, dayOfWeek: number): boolean {
-  const d = new Date(weekStart);
-  d.setDate(d.getDate() + (dayOfWeek - 1));
-  const today = new Date();
+function isDiaryEditableDay(
+  weekStart: Date,
+  dayOfWeek: number,
+  now: Date,
+): boolean {
+  const cellDate = new Date(weekStart);
+  cellDate.setDate(cellDate.getDate() + (dayOfWeek - 1));
+
+  // Diary day = today if now >= 08:00, else yesterday
+  const diaryDay = new Date(now);
+  if (diaryDay.getHours() < 8) {
+    diaryDay.setDate(diaryDay.getDate() - 1);
+  }
+
   return (
-    d.getFullYear() === today.getFullYear() &&
-    d.getMonth() === today.getMonth() &&
-    d.getDate() === today.getDate()
+    cellDate.getFullYear() === diaryDay.getFullYear() &&
+    cellDate.getMonth() === diaryDay.getMonth() &&
+    cellDate.getDate() === diaryDay.getDate()
   );
 }
 
@@ -341,7 +351,7 @@ export default function DashboardPage() {
             slot={selectedSlot}
             block={selectedBlock}
             diaryLines={getDiary(formatDateKey(weekStart, selectedDayOfWeek))}
-            isToday={isTodayInWeek(weekStart, selectedDayOfWeek)}
+            isToday={isDiaryEditableDay(weekStart, selectedDayOfWeek, new Date())}
             subtasks={
               selectedBlock ? getSubtasksForBlock(selectedBlock.id) : []
             }
