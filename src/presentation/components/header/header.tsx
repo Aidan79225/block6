@@ -10,6 +10,7 @@ interface HeaderProps {
   onNextWeek: () => void;
   onToggleTheme: () => void;
   onSignOut?: () => void;
+  onTitleClick: () => void;
 }
 
 export function Header({
@@ -20,6 +21,7 @@ export function Header({
   onNextWeek,
   onToggleTheme,
   onSignOut,
+  onTitleClick,
 }: HeaderProps) {
   return (
     <header
@@ -35,17 +37,25 @@ export function Header({
         minWidth: 0,
       }}
     >
-      <h1
+      <button
+        type="button"
+        onClick={onTitleClick}
+        aria-label="About The Block 6"
         style={{
           fontSize: "18px",
           fontWeight: 700,
           color: "var(--color-accent)",
           whiteSpace: "nowrap",
           flexShrink: 0,
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          font: "inherit",
         }}
       >
         The Block 6
-      </h1>
+      </button>
       <WeekNavigator
         weekStart={weekStart}
         onPreviousWeek={onPreviousWeek}
