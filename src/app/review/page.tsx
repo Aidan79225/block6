@@ -7,6 +7,7 @@ import { BlockTypeBreakdown } from "@/presentation/components/review/block-type-
 import { ReflectionEditor } from "@/presentation/components/review/reflection-editor";
 import { TaskTimeRanking } from "@/presentation/components/review/task-time-ranking";
 import { DiaryWeekView } from "@/presentation/components/review/diary-week-view";
+import { PlanChangesLog } from "@/presentation/components/review/plan-changes-log";
 import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
@@ -28,6 +29,8 @@ export default function ReviewPage() {
     getTaskTimeRanking,
     loadDiary,
     diaryEntries,
+    planChanges,
+    loadPlanChanges,
   } = useAppState();
 
   const weekKey = weekStart.toISOString().split("T")[0];
@@ -37,6 +40,10 @@ export default function ReviewPage() {
     loadWeek(weekKey);
     loadReflection(weekKey);
   }, [weekKey, loadWeek, loadReflection]);
+
+  useEffect(() => {
+    loadPlanChanges(weekKey);
+  }, [weekKey, loadPlanChanges]);
 
   useEffect(() => {
     for (let dow = 1; dow <= 7; dow++) {
@@ -83,6 +90,8 @@ export default function ReviewPage() {
     const entry = diaryEntries[dateKey];
     weekDiaries.push(entry ? { dayOfWeek: dow, ...entry } : null);
   }
+
+  const weekChanges = planChanges[weekKey] ?? [];
 
   const handleSaveReflection = (text: string) => {
     setReflection(text);
@@ -142,6 +151,7 @@ export default function ReviewPage() {
       <BlockTypeBreakdown byType={byType} />
       <TaskTimeRanking items={ranking} />
       <DiaryWeekView entries={weekDiaries} />
+      <PlanChangesLog changes={weekChanges} />
       <ReflectionEditor reflection={reflection} onSave={handleSaveReflection} />
     </div>
   );
