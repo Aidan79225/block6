@@ -13,11 +13,12 @@ import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
 import { BlockStatus, BlockType } from "@/domain/entities/block";
 import { upsertReflection } from "@/infrastructure/supabase/database";
 import { useNotify } from "@/presentation/providers/notification-provider";
+import { WeekNavigator } from "@/presentation/components/header/week-navigator";
 
 export default function ReviewPage() {
   const { user } = useAuth();
   const notify = useNotify();
-  const { weekStart } = useWeekPlan();
+  const { weekStart, goToPreviousWeek, goToNextWeek } = useWeekPlan();
   const {
     getBlocksForWeek,
     reflection,
@@ -109,6 +110,7 @@ export default function ReviewPage() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          gap: "12px",
         }}
       >
         <h1
@@ -120,6 +122,11 @@ export default function ReviewPage() {
         >
           週回顧
         </h1>
+        <WeekNavigator
+          weekStart={weekStart}
+          onPreviousWeek={goToPreviousWeek}
+          onNextWeek={goToNextWeek}
+        />
         <Link
           href="/"
           style={{ color: "var(--color-text-secondary)", fontSize: "14px" }}
