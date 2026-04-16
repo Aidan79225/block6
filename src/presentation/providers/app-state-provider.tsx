@@ -973,8 +973,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       if (typeof window === "undefined") return;
       const storageKey = PLAN_CHANGES_STORAGE_KEY("anon");
-      const raw = localStorage.getItem(storageKey);
-      const all: PlanChange[] = raw ? JSON.parse(raw) : [];
+      let all: PlanChange[] = [];
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) all = JSON.parse(raw);
+      } catch {
+        all = [];
+      }
       all.push(change);
       localStorage.setItem(storageKey, JSON.stringify(all));
     },
