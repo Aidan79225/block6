@@ -15,11 +15,14 @@ import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { CopyLastWeekBanner } from "@/presentation/components/dashboard/copy-last-week-banner";
+import { IntroDialog } from "@/presentation/components/intro-dialog/intro-dialog";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
 
 type Selection =
   | { kind: "block"; blockId: string }
   | { kind: "empty"; dayOfWeek: number; slot: number };
+
+const INTRO_STORAGE_KEY = "block6:hasSeenIntro";
 
 function formatDateKey(weekStart: Date, dayOfWeek: number): string {
   const d = new Date(weekStart);
@@ -92,6 +95,22 @@ export default function DashboardPage() {
   >("day");
   const [, forceTick] = useState(0);
   const [isCopying, setIsCopying] = useState(false);
+
+  const [introOpen, setIntroOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem(INTRO_STORAGE_KEY) !== "true") {
+      setIntroOpen(true);
+    }
+  }, []);
+
+  const closeIntro = () => {
+    setIntroOpen(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(INTRO_STORAGE_KEY, "true");
+    }
+  };
 
   const weekKey = weekStart.toISOString().split("T")[0];
   const blocks = getBlocksForWeek(weekKey);
@@ -220,6 +239,7 @@ export default function DashboardPage() {
         onNextWeek={goToNextWeek}
         onToggleTheme={toggleTheme}
         onSignOut={signOut}
+        onTitleClick={() => setIntroOpen(true)}
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
@@ -463,6 +483,7 @@ export default function DashboardPage() {
           />
         </div>
       )}
+      <IntroDialog open={introOpen} onClose={closeIntro} />
     </div>
   );
 }
