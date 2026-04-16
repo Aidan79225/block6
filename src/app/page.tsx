@@ -16,6 +16,8 @@ import { useAuth } from "@/presentation/providers/auth-provider";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { CopyLastWeekBanner } from "@/presentation/components/dashboard/copy-last-week-banner";
 import { IntroDialog } from "@/presentation/components/intro-dialog/intro-dialog";
+import { PlanChangeDialog } from "@/presentation/components/plan-change-dialog/plan-change-dialog";
+import type { PlanChangeAction } from "@/domain/entities/plan-change";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
 
 type Selection =
@@ -48,6 +50,20 @@ function isDiaryEditableDay(
     cellDate.getFullYear() === diaryDay.getFullYear() &&
     cellDate.getMonth() === diaryDay.getMonth() &&
     cellDate.getDate() === diaryDay.getDate()
+  );
+}
+
+function isLockedDay(
+  weekStart: Date,
+  dayOfWeek: number,
+  now: Date,
+): boolean {
+  const cellDate = new Date(weekStart);
+  cellDate.setDate(cellDate.getDate() + (dayOfWeek - 1));
+  return (
+    cellDate.getFullYear() === now.getFullYear() &&
+    cellDate.getMonth() === now.getMonth() &&
+    cellDate.getDate() === now.getDate()
   );
 }
 
@@ -86,6 +102,8 @@ export default function DashboardPage() {
     toggleWeeklyTaskCompletion,
     loadWeeklyCompletions,
     copyPreviousWeekPlan,
+    addPlanChange,
+    loadPlanChanges,
   } = useAppState();
   const notify = useNotify();
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -97,6 +115,106 @@ export default function DashboardPage() {
   const [isCopying, setIsCopying] = useState(false);
 
   const [introOpen, setIntroOpen] = useState(false);
+
+  type PendingChange =
+    | {
+        kind: "save";
+        dayOfWeek: number;
+        slot: number;
+        title: string;
+        description: string;
+        blockType: BlockType;
+        action: PlanChangeAction;
+      }
+    | {
+        kind: "swap";
+        idA: string;
+        idB: string;
+        logDayOfWeek: number;
+        logSlot: number;
+        titleSnapshot: string;
+      }
+    | {
+        kind: "move";
+        id: string;
+        dayOfWeek: number;
+        slot: number;
+        logDayOfWeek: number;
+        logSlot: number;
+        titleSnapshot: string;
+      };
+
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(
+    null,
+  );
+
+  const pendingSummary = (() => {
+    if (!pendingChange) return "";
+    if (pendingChange.kind === "save") {
+      if (pendingChange.action === "add") {
+        return `Add: "${pendingChange.title}" to day ${pendingChange.dayOfWeek} slot ${pendingChange.slot}`;
+      }
+      return `Edit: "${pendingChange.title}"`;
+    }
+    if (pendingChange.kind === "move") {
+      return `Move: "${pendingChange.titleSnapshot}" → day ${pendingChange.dayOfWeek} slot ${pendingChange.slot}`;
+    }
+    return `Swap: "${pendingChange.titleSnapshot}"`;
+  })();
+
+  const cancelPending = () => setPendingChange(null);
+
+  const confirmPending = async (reason: string) => {
+    if (!pendingChange) return;
+    const pending = pendingChange;
+    setPendingChange(null);
+
+    if (pending.kind === "save") {
+      const saved = saveBlock(
+        weekKey,
+        pending.dayOfWeek,
+        pending.slot,
+        pending.title,
+        pending.description,
+        pending.blockType,
+      );
+      if (selection?.kind === "empty") {
+        setSelection({ kind: "block", blockId: saved.id });
+      }
+      await addPlanChange({
+        weekKey,
+        dayOfWeek: pending.dayOfWeek,
+        slot: pending.slot,
+        blockTitleSnapshot: pending.title,
+        action: pending.action,
+        reason,
+      });
+      return;
+    }
+
+    if (pending.kind === "swap") {
+      await swapBlocks(pending.idA, pending.idB);
+      await addPlanChange({
+        weekKey,
+        dayOfWeek: pending.logDayOfWeek,
+        slot: pending.logSlot,
+        blockTitleSnapshot: pending.titleSnapshot,
+        action: "move",
+        reason,
+      });
+      return;
+    }
+
+    await moveBlock(pending.id, pending.dayOfWeek, pending.slot);
+    await addPlanChange({
+      weekKey,
+      dayOfWeek: pending.logDayOfWeek,
+      slot: pending.logSlot,
+      blockTitleSnapshot: pending.titleSnapshot,
+      action: "move",
+      reason,
+    });
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -122,6 +240,10 @@ export default function DashboardPage() {
   useEffect(() => {
     loadWeeklyCompletions(weekKey);
   }, [weekKey, loadWeeklyCompletions]);
+
+  useEffect(() => {
+    loadPlanChanges(weekKey);
+  }, [weekKey, loadPlanChanges]);
 
   // Force a re-render every second while a timer is running
   useEffect(() => {
@@ -211,8 +333,21 @@ export default function DashboardPage() {
       selection.kind === "block" ? selectedBlock?.slot : selection.slot;
     if (day == null || slot == null) return;
 
-    const saved = saveBlock(weekKey, day, slot, title, description, blockType);
+    const locked = isLockedDay(weekStart, day, new Date());
+    if (locked) {
+      setPendingChange({
+        kind: "save",
+        dayOfWeek: day,
+        slot,
+        title,
+        description,
+        blockType,
+        action: selection.kind === "empty" ? "add" : "edit",
+      });
+      return;
+    }
 
+    const saved = saveBlock(weekKey, day, slot, title, description, blockType);
     if (selection.kind === "empty") {
       setSelection({ kind: "block", blockId: saved.id });
     }
@@ -227,6 +362,53 @@ export default function DashboardPage() {
     if (selectedDayOfWeek == null) return;
     const dateKey = formatDateKey(weekStart, selectedDayOfWeek);
     saveDiary(dateKey, bad, good, next);
+  };
+
+  const handleSwapBlocks = async (idA: string, idB: string) => {
+    const a = blocks.find((b) => b.id === idA);
+    const b = blocks.find((b) => b.id === idB);
+    if (!a || !b) return;
+    const now = new Date();
+    const aLocked = isLockedDay(weekStart, a.dayOfWeek, now);
+    const bLocked = isLockedDay(weekStart, b.dayOfWeek, now);
+    if (aLocked || bLocked) {
+      const affected = aLocked ? a : b;
+      setPendingChange({
+        kind: "swap",
+        idA,
+        idB,
+        logDayOfWeek: affected.dayOfWeek,
+        logSlot: affected.slot,
+        titleSnapshot: affected.title,
+      });
+      return;
+    }
+    await swapBlocks(idA, idB);
+  };
+
+  const handleMoveBlock = async (
+    id: string,
+    dayOfWeek: number,
+    slot: number,
+  ) => {
+    const src = blocks.find((b) => b.id === id);
+    if (!src) return;
+    const now = new Date();
+    const srcLocked = isLockedDay(weekStart, src.dayOfWeek, now);
+    const destLocked = isLockedDay(weekStart, dayOfWeek, now);
+    if (srcLocked || destLocked) {
+      setPendingChange({
+        kind: "move",
+        id,
+        dayOfWeek,
+        slot,
+        logDayOfWeek: destLocked ? dayOfWeek : src.dayOfWeek,
+        logSlot: destLocked ? slot : src.slot,
+        titleSnapshot: src.title,
+      });
+      return;
+    }
+    await moveBlock(id, dayOfWeek, slot);
   };
 
   return (
@@ -256,8 +438,8 @@ export default function DashboardPage() {
               selectedDayOfWeek={selectedDayOfWeek}
               selectedSlot={selectedSlot}
               onBlockClick={handleBlockClick}
-              onSwapBlocks={swapBlocks}
-              onMoveBlock={moveBlock}
+              onSwapBlocks={handleSwapBlocks}
+              onMoveBlock={handleMoveBlock}
             />
           </div>
           <div className="mobile-only">
@@ -483,6 +665,12 @@ export default function DashboardPage() {
           />
         </div>
       )}
+      <PlanChangeDialog
+        open={pendingChange !== null}
+        summary={pendingSummary}
+        onCancel={cancelPending}
+        onConfirm={confirmPending}
+      />
       <IntroDialog open={introOpen} onClose={closeIntro} />
     </div>
   );
