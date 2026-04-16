@@ -5,9 +5,9 @@ interface PlanChangesLogProps {
 }
 
 const ACTION_LABEL: Record<PlanChange["action"], string> = {
-  edit: "Edit",
-  move: "Move",
-  add: "Add",
+  edit: "編輯",
+  move: "移動",
+  add: "新增",
 };
 
 const ACTION_COLOR: Record<PlanChange["action"], string> = {
