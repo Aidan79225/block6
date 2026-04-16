@@ -16,8 +16,8 @@ create index plan_changes_user_week_idx on plan_changes (user_id, week_key);
 
 alter table plan_changes enable row level security;
 
-create policy plan_changes_select_own on plan_changes
+create policy "Users read own plan changes" on plan_changes
   for select using (auth.uid() = user_id);
 
-create policy plan_changes_insert_own on plan_changes
+create policy "Users insert own plan changes" on plan_changes
   for insert with check (auth.uid() = user_id);

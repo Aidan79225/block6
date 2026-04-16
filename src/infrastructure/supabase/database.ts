@@ -750,7 +750,6 @@ export async function insertPlanChange(
       block_title_snapshot: change.blockTitleSnapshot,
       action: change.action,
       reason: change.reason,
-      created_at: change.createdAt,
     })
     .select()
     .single();
