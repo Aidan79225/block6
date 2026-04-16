@@ -26,7 +26,7 @@ export function PlanChangeDialog({
 
   useEffect(() => {
     if (open) {
-      setTimeout(() => textareaRef.current?.focus(), 0);
+      textareaRef.current?.focus();
     }
   }, [open]);
 
@@ -68,6 +68,7 @@ export function PlanChangeDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="plan-change-dialog-title"
+        aria-describedby="plan-change-dialog-desc"
         style={{
           background: "var(--color-bg-secondary)",
           color: "var(--color-text-primary)",
@@ -91,6 +92,7 @@ export function PlanChangeDialog({
           Why are you changing today&apos;s plan?
         </h2>
         <p
+          id="plan-change-dialog-desc"
           style={{
             fontSize: "13px",
             color: "var(--color-text-secondary)",
@@ -104,6 +106,7 @@ export function PlanChangeDialog({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Reason (required)"
+          aria-label="Reason for change"
           rows={4}
           style={{
             width: "100%",
