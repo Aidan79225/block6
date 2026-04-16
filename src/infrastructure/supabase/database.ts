@@ -1,5 +1,9 @@
 import { supabase } from "./client";
 import type { Block } from "@/domain/entities/block";
+import type {
+  PlanChange,
+  PlanChangeAction,
+} from "@/domain/entities/plan-change";
 import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import type { Subtask } from "@/domain/entities/subtask";
 import { createSubtask } from "@/domain/entities/subtask";
@@ -687,4 +691,68 @@ export async function removeWeeklyTaskCompletion(
     .eq("weekly_task_id", weeklyTaskId)
     .eq("week_start", weekStart);
   if (error) throw new Error(error.message);
+}
+
+// --- Plan changes ---
+
+interface DbPlanChange {
+  id: string;
+  user_id: string;
+  week_key: string;
+  day_of_week: number;
+  slot: number;
+  block_title_snapshot: string;
+  action: PlanChangeAction;
+  reason: string;
+  created_at: string;
+}
+
+function dbPlanChangeToEntity(db: DbPlanChange): PlanChange {
+  return {
+    id: db.id,
+    userId: db.user_id,
+    weekKey: db.week_key,
+    dayOfWeek: db.day_of_week,
+    slot: db.slot,
+    blockTitleSnapshot: db.block_title_snapshot,
+    action: db.action,
+    reason: db.reason,
+    createdAt: db.created_at,
+  };
+}
+
+export async function fetchPlanChangesForWeek(
+  userId: string,
+  weekKey: string,
+): Promise<PlanChange[]> {
+  const { data, error } = await supabase
+    .from("plan_changes")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("week_key", weekKey)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(dbPlanChangeToEntity);
+}
+
+export async function insertPlanChange(
+  change: PlanChange,
+): Promise<PlanChange> {
+  if (!change.userId) throw new Error("insertPlanChange requires a userId");
+  const { data, error } = await supabase
+    .from("plan_changes")
+    .insert({
+      id: change.id,
+      user_id: change.userId,
+      week_key: change.weekKey,
+      day_of_week: change.dayOfWeek,
+      slot: change.slot,
+      block_title_snapshot: change.blockTitleSnapshot,
+      action: change.action,
+      reason: change.reason,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return dbPlanChangeToEntity(data as DbPlanChange);
 }

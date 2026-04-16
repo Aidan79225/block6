@@ -47,8 +47,13 @@ import {
   fetchWeeklyTaskCompletions,
   addWeeklyTaskCompletion as dbAddWeeklyTaskCompletion,
   removeWeeklyTaskCompletion as dbRemoveWeeklyTaskCompletion,
+  fetchPlanChangesForWeek,
+  insertPlanChange,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
+import type { PlanChange } from "@/domain/entities/plan-change";
+import { logPlanChange } from "@/domain/usecases/log-plan-change";
+import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
 
 interface AppState {
   allBlocks: Block[];
@@ -63,6 +68,9 @@ interface AppState {
   ) => Block;
   updateStatus: (blockId: string, status: BlockStatus) => void;
   copyPreviousWeekPlan: (currentWeekKey: string) => Promise<number>;
+  planChanges: Record<string, PlanChange[]>;
+  loadPlanChanges: (weekKey: string) => Promise<void>;
+  addPlanChange: (input: Omit<LogPlanChangeInput, "userId">) => Promise<void>;
   swapBlocks: (idA: string, idB: string) => Promise<void>;
   moveBlock: (id: string, dayOfWeek: number, slot: number) => Promise<void>;
   diaryEntries: Record<string, DiaryLines>;
@@ -276,6 +284,9 @@ function getServerSnapshot(): PersistedData {
 
 const AppStateContext = createContext<AppState | null>(null);
 
+const PLAN_CHANGES_STORAGE_KEY = (userIdOrAnon: string) =>
+  `block6:planChanges:${userIdOrAnon}`;
+
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const notify = useNotify();
@@ -302,6 +313,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [weeklyCompletions, setWeeklyCompletions] = useState<
     Record<string, Set<string>>
   >({});
+
+  const [planChanges, setPlanChanges] = useState<Record<string, PlanChange[]>>(
+    {},
+  );
+  const loadedPlanChangeWeeks = useRef<Set<string>>(new Set());
 
   const loadedWeeks = useRef<Set<string>>(new Set());
   const loadedCompletionsWeeks = useRef<Set<string>>(new Set());
@@ -903,6 +919,73 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, notify],
   );
 
+  const loadPlanChanges = useCallback(
+    async (weekKey: string) => {
+      const key = user?.id ?? "anon";
+      const cacheKey = `${key}:${weekKey}`;
+      if (loadedPlanChangeWeeks.current.has(cacheKey)) return;
+      loadedPlanChangeWeeks.current.add(cacheKey);
+
+      if (user) {
+        try {
+          const rows = await fetchPlanChangesForWeek(user.id, weekKey);
+          setPlanChanges((prev) => ({ ...prev, [weekKey]: rows }));
+        } catch (err) {
+          console.error(err);
+          loadedPlanChangeWeeks.current.delete(cacheKey);
+          notify.error("載入計畫變更紀錄失敗");
+        }
+        return;
+      }
+
+      if (typeof window === "undefined") return;
+      try {
+        const raw = localStorage.getItem(PLAN_CHANGES_STORAGE_KEY("anon"));
+        const all: PlanChange[] = raw ? JSON.parse(raw) : [];
+        const forWeek = all.filter((c) => c.weekKey === weekKey);
+        setPlanChanges((prev) => ({ ...prev, [weekKey]: forWeek }));
+      } catch {
+        setPlanChanges((prev) => ({ ...prev, [weekKey]: [] }));
+      }
+    },
+    [user, notify],
+  );
+
+  const addPlanChange = useCallback(
+    async (input: Omit<LogPlanChangeInput, "userId">) => {
+      const userId = user?.id ?? null;
+      const change = logPlanChange({ ...input, userId });
+
+      setPlanChanges((prev) => {
+        const existing = prev[input.weekKey] ?? [];
+        return { ...prev, [input.weekKey]: [...existing, change] };
+      });
+
+      if (user) {
+        try {
+          await insertPlanChange(change);
+        } catch (err) {
+          console.error(err);
+          notify.error("儲存計畫變更紀錄失敗");
+        }
+        return;
+      }
+
+      if (typeof window === "undefined") return;
+      const storageKey = PLAN_CHANGES_STORAGE_KEY("anon");
+      let all: PlanChange[] = [];
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) all = JSON.parse(raw);
+      } catch {
+        all = [];
+      }
+      all.push(change);
+      localStorage.setItem(storageKey, JSON.stringify(all));
+    },
+    [user, notify],
+  );
+
   const toggleWeeklyTaskCompletion = useCallback(
     (id: string, weekKey: string) => {
       const current = weeklyCompletions[weekKey] ?? new Set<string>();
@@ -1067,6 +1150,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveBlock,
         updateStatus,
         copyPreviousWeekPlan,
+        planChanges,
+        loadPlanChanges,
+        addPlanChange,
         swapBlocks,
         moveBlock,
         diaryEntries,
