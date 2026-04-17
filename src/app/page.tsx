@@ -19,6 +19,11 @@ import { IntroDialog } from "@/presentation/components/intro-dialog/intro-dialog
 import { PlanChangeDialog } from "@/presentation/components/plan-change-dialog/plan-change-dialog";
 import type { PlanChangeAction } from "@/domain/entities/plan-change";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
+import {
+  getCellDate,
+  formatDateKey,
+  isSameLocalDay,
+} from "@/presentation/lib/date-helpers";
 
 type Selection =
   | { kind: "block"; blockId: string }
@@ -26,19 +31,7 @@ type Selection =
 
 const INTRO_STORAGE_KEY = "block6:hasSeenIntro";
 
-function formatDateKey(weekStart: Date, dayOfWeek: number): string {
-  const d = new Date(weekStart);
-  d.setDate(d.getDate() + (dayOfWeek - 1));
-  return d.toISOString().split("T")[0];
-}
-
 type DiaryMode = "editable" | "readonly" | "hidden";
-
-function getCellDate(weekStart: Date, dayOfWeek: number): Date {
-  const d = new Date(weekStart);
-  d.setDate(d.getDate() + (dayOfWeek - 1));
-  return d;
-}
 
 function isDiaryEditableDay(cellDate: Date, now: Date): boolean {
   // Diary day = today if now >= 08:00, else yesterday
@@ -46,11 +39,7 @@ function isDiaryEditableDay(cellDate: Date, now: Date): boolean {
   if (diaryDay.getHours() < 8) {
     diaryDay.setDate(diaryDay.getDate() - 1);
   }
-  return (
-    cellDate.getFullYear() === diaryDay.getFullYear() &&
-    cellDate.getMonth() === diaryDay.getMonth() &&
-    cellDate.getDate() === diaryDay.getDate()
-  );
+  return isSameLocalDay(cellDate, diaryDay);
 }
 
 function getDiaryMode(cellDate: Date, now: Date): DiaryMode {
@@ -61,18 +50,8 @@ function getDiaryMode(cellDate: Date, now: Date): DiaryMode {
   return "hidden";
 }
 
-function isLockedDay(
-  weekStart: Date,
-  dayOfWeek: number,
-  now: Date,
-): boolean {
-  const cellDate = new Date(weekStart);
-  cellDate.setDate(cellDate.getDate() + (dayOfWeek - 1));
-  return (
-    cellDate.getFullYear() === now.getFullYear() &&
-    cellDate.getMonth() === now.getMonth() &&
-    cellDate.getDate() === now.getDate()
-  );
+function isLockedDay(cellDate: Date, now: Date): boolean {
+  return isSameLocalDay(cellDate, now);
 }
 
 export default function DashboardPage() {
@@ -238,7 +217,7 @@ export default function DashboardPage() {
     }
   };
 
-  const weekKey = weekStart.toISOString().split("T")[0];
+  const weekKey = formatDateKey(weekStart);
   const blocks = getBlocksForWeek(weekKey);
 
   useEffect(() => {
@@ -277,7 +256,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (selectedDayOfWeek != null) {
-      const dateKey = formatDateKey(weekStart, selectedDayOfWeek);
+      const dateKey = formatDateKey(getCellDate(weekStart, selectedDayOfWeek));
       loadDiary(dateKey);
     }
   }, [selectedDayOfWeek, weekStart, loadDiary]);
@@ -341,7 +320,7 @@ export default function DashboardPage() {
       selection.kind === "block" ? selectedBlock?.slot : selection.slot;
     if (day == null || slot == null) return;
 
-    const locked = isLockedDay(weekStart, day, new Date());
+    const locked = isLockedDay(getCellDate(weekStart, day), new Date());
     if (locked) {
       setPendingChange({
         kind: "save",
@@ -368,7 +347,7 @@ export default function DashboardPage() {
 
   const handleSaveDiary = (bad: string, good: string, next: string) => {
     if (selectedDayOfWeek == null) return;
-    const dateKey = formatDateKey(weekStart, selectedDayOfWeek);
+    const dateKey = formatDateKey(getCellDate(weekStart, selectedDayOfWeek));
     saveDiary(dateKey, bad, good, next);
   };
 
@@ -377,8 +356,8 @@ export default function DashboardPage() {
     const b = blocks.find((b) => b.id === idB);
     if (!a || !b) return;
     const now = new Date();
-    const aLocked = isLockedDay(weekStart, a.dayOfWeek, now);
-    const bLocked = isLockedDay(weekStart, b.dayOfWeek, now);
+    const aLocked = isLockedDay(getCellDate(weekStart, a.dayOfWeek), now);
+    const bLocked = isLockedDay(getCellDate(weekStart, b.dayOfWeek), now);
     if (aLocked || bLocked) {
       const affected = aLocked ? a : b;
       setPendingChange({
@@ -402,8 +381,8 @@ export default function DashboardPage() {
     const src = blocks.find((b) => b.id === id);
     if (!src) return;
     const now = new Date();
-    const srcLocked = isLockedDay(weekStart, src.dayOfWeek, now);
-    const destLocked = isLockedDay(weekStart, dayOfWeek, now);
+    const srcLocked = isLockedDay(getCellDate(weekStart, src.dayOfWeek), now);
+    const destLocked = isLockedDay(getCellDate(weekStart, dayOfWeek), now);
     if (srcLocked || destLocked) {
       setPendingChange({
         kind: "move",
@@ -560,7 +539,7 @@ export default function DashboardPage() {
             dayOfWeek={selectedDayOfWeek}
             slot={selectedSlot}
             block={selectedBlock}
-            diaryLines={getDiary(formatDateKey(weekStart, selectedDayOfWeek))}
+            diaryLines={getDiary(formatDateKey(getCellDate(weekStart, selectedDayOfWeek)))}
             diaryMode={getDiaryMode(
               getCellDate(weekStart, selectedDayOfWeek),
               new Date(),
