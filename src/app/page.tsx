@@ -561,12 +561,10 @@ export default function DashboardPage() {
             slot={selectedSlot}
             block={selectedBlock}
             diaryLines={getDiary(formatDateKey(weekStart, selectedDayOfWeek))}
-            isToday={
-              getDiaryMode(
-                getCellDate(weekStart, selectedDayOfWeek),
-                new Date(),
-              ) === "editable"
-            }
+            diaryMode={getDiaryMode(
+              getCellDate(weekStart, selectedDayOfWeek),
+              new Date(),
+            )}
             subtasks={
               selectedBlock ? getSubtasksForBlock(selectedBlock.id) : []
             }
