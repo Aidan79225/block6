@@ -42,8 +42,12 @@ function makeProps(overrides: Partial<SidePanelProps> = {}): SidePanelProps {
 describe("SidePanel diary rendering", () => {
   it('renders DiaryForm when diaryMode is "editable"', () => {
     render(<SidePanel {...makeProps({ diaryMode: "editable" })} />);
-    expect(screen.getByRole("button", { name: /儲存/ })).toBeInTheDocument();
-    expect(screen.getAllByRole("textbox")).toHaveLength(3);
+    // DiaryForm-specific placeholders are present
+    expect(screen.getByPlaceholderText(/Bad — /)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Good — /)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Next — /)).toBeInTheDocument();
+    // DiaryReadOnlyView values are absent (no diaryLines supplied)
+    expect(screen.queryByText("分心")).toBeNull();
   });
 
   it('renders DiaryReadOnlyView when diaryMode is "readonly" and diaryLines exist', () => {
@@ -55,11 +59,12 @@ describe("SidePanel diary rendering", () => {
         })}
       />,
     );
+    // DiaryReadOnlyView values are present
     expect(screen.getByText("分心")).toBeInTheDocument();
     expect(screen.getByText("完成")).toBeInTheDocument();
     expect(screen.getByText("調整")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.queryByRole("button", { name: /儲存/ })).toBeNull();
+    // DiaryForm placeholders are absent
+    expect(screen.queryByPlaceholderText(/Bad — /)).toBeNull();
   });
 
   it('renders neither form nor read-only view when diaryMode is "readonly" and diaryLines is null', () => {
@@ -68,8 +73,9 @@ describe("SidePanel diary rendering", () => {
         {...makeProps({ diaryMode: "readonly", diaryLines: null })}
       />,
     );
-    expect(screen.queryByText("情緒日記")).toBeNull();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    // Neither DiaryForm nor DiaryReadOnlyView is rendered
+    expect(screen.queryByPlaceholderText(/Bad — /)).toBeNull();
+    expect(screen.queryByText("分心")).toBeNull();
   });
 
   it('renders neither when diaryMode is "hidden"', () => {
@@ -77,11 +83,13 @@ describe("SidePanel diary rendering", () => {
       <SidePanel
         {...makeProps({
           diaryMode: "hidden",
-          diaryLines: { bad: "x", good: "y", next: "z" },
+          diaryLines: { bad: "分心", good: "完成", next: "調整" },
         })}
       />,
     );
-    expect(screen.queryByText("情緒日記")).toBeNull();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    // DiaryForm placeholders are absent
+    expect(screen.queryByPlaceholderText(/Bad — /)).toBeNull();
+    // DiaryReadOnlyView values are absent despite diaryLines being provided
+    expect(screen.queryByText("分心")).toBeNull();
   });
 });

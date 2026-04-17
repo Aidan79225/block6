@@ -100,15 +100,13 @@ export function SidePanel({
           &times;
         </button>
       </div>
-      {block && (
-        <BlockEditor
-          key={`editor-${dayOfWeek}-${slot}`}
-          title={block.title}
-          description={block.description}
-          blockType={block.blockType}
-          onSave={onSaveBlock}
-        />
-      )}
+      <BlockEditor
+        key={`editor-${dayOfWeek}-${slot}`}
+        title={block?.title ?? ""}
+        description={block?.description ?? ""}
+        blockType={block?.blockType ?? BlockType.General}
+        onSave={onSaveBlock}
+      />
       {block && (
         <>
           <SubtaskList
