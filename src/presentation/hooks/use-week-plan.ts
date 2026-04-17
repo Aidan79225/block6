@@ -1,14 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
-
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setUTCDate(d.getUTCDate() + diff);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
+import { getMonday } from "@/presentation/lib/date-helpers";
 
 export function useWeekPlan() {
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));

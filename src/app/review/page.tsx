@@ -15,6 +15,10 @@ import { BlockStatus, BlockType } from "@/domain/entities/block";
 import { upsertReflection } from "@/infrastructure/supabase/database";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { WeekNavigator } from "@/presentation/components/header/week-navigator";
+import {
+  getCellDate,
+  formatDateKey,
+} from "@/presentation/lib/date-helpers";
 
 export default function ReviewPage() {
   const { user } = useAuth();
@@ -33,7 +37,7 @@ export default function ReviewPage() {
     loadPlanChanges,
   } = useAppState();
 
-  const weekKey = weekStart.toISOString().split("T")[0];
+  const weekKey = formatDateKey(weekStart);
   const blocks = getBlocksForWeek(weekKey);
 
   useEffect(() => {
@@ -47,9 +51,7 @@ export default function ReviewPage() {
 
   useEffect(() => {
     for (let dow = 1; dow <= 7; dow++) {
-      const d = new Date(weekStart);
-      d.setDate(d.getDate() + (dow - 1));
-      const dateKey = d.toISOString().split("T")[0];
+      const dateKey = formatDateKey(getCellDate(weekStart, dow));
       loadDiary(dateKey);
     }
   }, [weekStart, loadDiary]);
@@ -84,9 +86,7 @@ export default function ReviewPage() {
     next: string;
   } | null> = [];
   for (let dow = 1; dow <= 7; dow++) {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + (dow - 1));
-    const dateKey = d.toISOString().split("T")[0];
+    const dateKey = formatDateKey(getCellDate(weekStart, dow));
     const entry = diaryEntries[dateKey];
     weekDiaries.push(entry ? { dayOfWeek: dow, ...entry } : null);
   }

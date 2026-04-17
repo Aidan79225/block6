@@ -54,6 +54,7 @@ import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
+import { formatDateKey } from "@/presentation/lib/date-helpers";
 
 interface AppState {
   allBlocks: Block[];
@@ -594,8 +595,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       const currentDate = new Date(currentWeekKey);
       const prev = new Date(currentDate);
-      prev.setUTCDate(prev.getUTCDate() - 7);
-      const previousWeekKey = prev.toISOString().split("T")[0];
+      prev.setDate(prev.getDate() - 7);
+      const previousWeekKey = formatDateKey(prev);
 
       const prevBlocks = await fetchBlocksForWeek(user.id, previousWeekKey);
       if (prevBlocks.length === 0) return 0;
