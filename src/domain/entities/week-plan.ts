@@ -12,7 +12,7 @@ export interface CreateWeekPlanInput {
 }
 
 export function createWeekPlan(input: CreateWeekPlanInput): WeekPlan {
-  if (input.weekStart.getUTCDay() !== 1)
+  if (input.weekStart.getDay() !== 1)
     throw new Error("weekStart must be a Monday");
   return { ...input };
 }
