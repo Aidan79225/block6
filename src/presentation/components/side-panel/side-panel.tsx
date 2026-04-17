@@ -4,6 +4,7 @@ import type { Subtask } from "@/domain/entities/subtask";
 import { BlockEditor } from "./block-editor";
 import { StatusToggle } from "./status-toggle";
 import { DiaryForm } from "./diary-form";
+import { DiaryReadOnlyView } from "./diary-readonly-view";
 import { SubtaskList } from "./subtask-list";
 import { BlockTimer } from "./block-timer";
 
@@ -12,7 +13,7 @@ interface SidePanelProps {
   slot: number;
   block: Block | null;
   diaryLines: { bad: string; good: string; next: string } | null;
-  isToday: boolean;
+  diaryMode: "editable" | "readonly" | "hidden";
   subtasks: Subtask[];
   elapsedSeconds: number;
   isTimerActive: boolean;
@@ -43,7 +44,7 @@ export function SidePanel({
   slot,
   block,
   diaryLines,
-  isToday,
+  diaryMode,
   subtasks,
   elapsedSeconds,
   isTimerActive,
@@ -142,13 +143,20 @@ export function SidePanel({
           </div>
         </>
       )}
-      {isToday && (
+      {diaryMode === "editable" && (
         <DiaryForm
           key={`diary-${dayOfWeek}`}
           bad={diaryLines?.bad ?? ""}
           good={diaryLines?.good ?? ""}
           next={diaryLines?.next ?? ""}
           onSave={onSaveDiary}
+        />
+      )}
+      {diaryMode === "readonly" && diaryLines && (
+        <DiaryReadOnlyView
+          bad={diaryLines.bad}
+          good={diaryLines.good}
+          next={diaryLines.next}
         />
       )}
     </aside>

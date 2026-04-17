@@ -32,25 +32,33 @@ function formatDateKey(weekStart: Date, dayOfWeek: number): string {
   return d.toISOString().split("T")[0];
 }
 
-function isDiaryEditableDay(
-  weekStart: Date,
-  dayOfWeek: number,
-  now: Date,
-): boolean {
-  const cellDate = new Date(weekStart);
-  cellDate.setDate(cellDate.getDate() + (dayOfWeek - 1));
+type DiaryMode = "editable" | "readonly" | "hidden";
 
+function getCellDate(weekStart: Date, dayOfWeek: number): Date {
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + (dayOfWeek - 1));
+  return d;
+}
+
+function isDiaryEditableDay(cellDate: Date, now: Date): boolean {
   // Diary day = today if now >= 08:00, else yesterday
   const diaryDay = new Date(now);
   if (diaryDay.getHours() < 8) {
     diaryDay.setDate(diaryDay.getDate() - 1);
   }
-
   return (
     cellDate.getFullYear() === diaryDay.getFullYear() &&
     cellDate.getMonth() === diaryDay.getMonth() &&
     cellDate.getDate() === diaryDay.getDate()
   );
+}
+
+function getDiaryMode(cellDate: Date, now: Date): DiaryMode {
+  if (isDiaryEditableDay(cellDate, now)) return "editable";
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  if (cellDate.getTime() < startOfToday.getTime()) return "readonly";
+  return "hidden";
 }
 
 function isLockedDay(
@@ -553,7 +561,10 @@ export default function DashboardPage() {
             slot={selectedSlot}
             block={selectedBlock}
             diaryLines={getDiary(formatDateKey(weekStart, selectedDayOfWeek))}
-            isToday={isDiaryEditableDay(weekStart, selectedDayOfWeek, new Date())}
+            diaryMode={getDiaryMode(
+              getCellDate(weekStart, selectedDayOfWeek),
+              new Date(),
+            )}
             subtasks={
               selectedBlock ? getSubtasksForBlock(selectedBlock.id) : []
             }
