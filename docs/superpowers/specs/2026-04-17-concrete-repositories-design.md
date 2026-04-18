@@ -21,9 +21,6 @@ path to go through use cases.
 - Five `InMemory*Repository` classes, each a simple in-memory map backed by
   the domain entity shape.
 - Each in-memory repo covered by a dedicated unit test file.
-- The five existing use-case test files stop defining inline mock repos and
-  use the new `InMemory*Repository` classes instead. Net line count goes
-  down.
 - `pnpm lint && pnpm type-check && pnpm test` passes.
 
 ## Out of Scope
@@ -174,23 +171,15 @@ the interface's primary finder needs.
 
 ---
 
-## Test Migration
+## Existing Use-Case Tests — Unchanged in This PR
 
-The five use-case test files currently define inline mock repos:
-
-- `src/__tests__/domain/usecases/update-block.test.ts`
-- `src/__tests__/domain/usecases/update-block-status.test.ts`
-- `src/__tests__/domain/usecases/write-diary.test.ts`
-- `src/__tests__/domain/usecases/get-week-summary.test.ts`
-- `src/__tests__/domain/usecases/create-week-review.test.ts`
-- `src/__tests__/domain/usecases/create-week-plan.test.ts`
-
-Six files total.
-
-Each file stops declaring a local `makeRepo` / `mockRepo` object literal and
-imports the corresponding `InMemory*Repository` class instead. Existing test
-cases retain identical behavior — the only change is where the repo comes
-from.
+The six use-case test files under `src/__tests__/domain/usecases/` currently
+use `vi.fn()` based mocks with call-count assertions like
+`toHaveBeenCalledOnce()`. Migrating them to the new `InMemory*Repository`
+classes would require rewriting them as behavior/state assertions, not a
+mechanical import swap — and the net line count would likely go up, not
+down. That migration (if valuable at all) belongs in a later sub-project,
+once the in-memory repos have a concrete consumer that validates the shape.
 
 ---
 
@@ -207,9 +196,9 @@ it's time to actually mount the provider.
 ## Testing Strategy
 
 - **New:** one test file per in-memory repo (~5–8 test cases each).
-- **Updated:** six use-case test files swap inline mocks for `InMemory*Repository` imports.
 - **No tests for Supabase repos.**
-- `pnpm test` total count increases by the in-memory test count minus the slight consolidation from switching mock definitions (net +30–50 tests).
+- **Existing use-case tests unchanged** (see note above).
+- `pnpm test` total count grows by roughly 25–40 new in-memory repo tests.
 
 ---
 
@@ -227,10 +216,6 @@ Modify (1):
   (`fetchBlockById`, `fetchBlocksByWeekPlanId`, `fetchDiaryRange`,
   `upsertDiaryEntry`, `fetchWeekPlan`, `insertWeekPlan`,
   `fetchWeekReviewByWeekPlanId`). Existing functions stay untouched.
-
-Modify (6):
-- `src/__tests__/domain/usecases/{update-block,update-block-status,write-diary,get-week-summary,create-week-review,create-week-plan}.test.ts`
-  — replace inline mock repos with `InMemory*Repository` imports.
 
 No other files change. No DB migrations.
 
