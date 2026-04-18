@@ -11,6 +11,7 @@ import type { WeeklyTask } from "@/domain/entities/weekly-task";
 import { createWeeklyTask } from "@/domain/entities/weekly-task";
 import type { TimerSession } from "@/domain/entities/timer-session";
 import { createTimerSession } from "@/domain/entities/timer-session";
+import type { DiaryEntry } from "@/domain/entities/diary-entry";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
@@ -302,6 +303,86 @@ export async function upsertDiary(
     });
     if (error) throw new Error(error.message);
   }
+}
+
+interface DbDiaryFull {
+  id: string;
+  user_id: string;
+  entry_date: string;
+  bad: string;
+  good: string;
+  next: string;
+  created_at: string;
+}
+
+function dbDiaryToEntity(db: DbDiaryFull): DiaryEntry {
+  const [y, m, d] = db.entry_date.split("-").map(Number);
+  return {
+    id: db.id,
+    userId: db.user_id,
+    entryDate: new Date(y, m - 1, d),
+    bad: db.bad,
+    good: db.good,
+    next: db.next,
+    createdAt: new Date(db.created_at),
+  };
+}
+
+export async function fetchDiaryEntry(
+  userId: string,
+  dateKey: string,
+): Promise<DiaryEntry | null> {
+  const { data, error } = await supabase
+    .from("diary_entries")
+    .select("id, user_id, entry_date, bad, good, next, created_at")
+    .eq("user_id", userId)
+    .eq("entry_date", dateKey)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbDiaryToEntity(data as DbDiaryFull);
+}
+
+export async function fetchDiaryRange(
+  userId: string,
+  startKey: string,
+  endKey: string,
+): Promise<DiaryEntry[]> {
+  const { data, error } = await supabase
+    .from("diary_entries")
+    .select("id, user_id, entry_date, bad, good, next, created_at")
+    .eq("user_id", userId)
+    .gte("entry_date", startKey)
+    .lte("entry_date", endKey);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => dbDiaryToEntity(row as DbDiaryFull));
+}
+
+export async function insertDiaryEntry(entry: DiaryEntry): Promise<void> {
+  const y = entry.entryDate.getFullYear();
+  const m = String(entry.entryDate.getMonth() + 1).padStart(2, "0");
+  const d = String(entry.entryDate.getDate()).padStart(2, "0");
+  const { error } = await supabase.from("diary_entries").insert({
+    id: entry.id,
+    user_id: entry.userId,
+    entry_date: `${y}-${m}-${d}`,
+    bad: entry.bad,
+    good: entry.good,
+    next: entry.next,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateDiaryEntry(entry: DiaryEntry): Promise<void> {
+  const { error } = await supabase
+    .from("diary_entries")
+    .update({
+      bad: entry.bad,
+      good: entry.good,
+      next: entry.next,
+    })
+    .eq("id", entry.id);
+  if (error) throw new Error(error.message);
 }
 
 // --- Week Reviews ---
