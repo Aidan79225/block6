@@ -23,7 +23,7 @@ import {
   getCellDate,
   formatDateKey,
   isSameLocalDay,
-} from "@/presentation/lib/date-helpers";
+} from "@/lib/date-helpers";
 
 type Selection =
   | { kind: "block"; blockId: string }

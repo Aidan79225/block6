@@ -1,6 +1,6 @@
 import type { WeekPlan } from "@/domain/entities/week-plan";
 import type { WeekPlanRepository } from "@/domain/repositories/week-plan-repository";
-import { isSameLocalDay } from "@/presentation/lib/date-helpers";
+import { isSameLocalDay } from "@/lib/date-helpers";
 
 export class InMemoryWeekPlanRepository implements WeekPlanRepository {
   private readonly byId = new Map<string, WeekPlan>();

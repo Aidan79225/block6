@@ -1,6 +1,6 @@
 import type { WeekPlan } from "@/domain/entities/week-plan";
 import type { WeekPlanRepository } from "@/domain/repositories/week-plan-repository";
-import { formatDateKey } from "@/presentation/lib/date-helpers";
+import { formatDateKey } from "@/lib/date-helpers";
 import {
   fetchWeekPlan,
   insertWeekPlan,

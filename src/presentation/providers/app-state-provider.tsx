@@ -54,7 +54,7 @@ import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
-import { formatDateKey } from "@/presentation/lib/date-helpers";
+import { formatDateKey } from "@/lib/date-helpers";
 
 interface AppState {
   allBlocks: Block[];

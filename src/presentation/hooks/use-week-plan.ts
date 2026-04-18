@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
-import { getMonday } from "@/presentation/lib/date-helpers";
+import { getMonday } from "@/lib/date-helpers";
 
 export function useWeekPlan() {
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));

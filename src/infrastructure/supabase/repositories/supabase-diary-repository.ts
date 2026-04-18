@@ -1,6 +1,6 @@
 import type { DiaryEntry } from "@/domain/entities/diary-entry";
 import type { DiaryRepository } from "@/domain/repositories/diary-repository";
-import { formatDateKey } from "@/presentation/lib/date-helpers";
+import { formatDateKey } from "@/lib/date-helpers";
 import {
   fetchDiaryEntry,
   fetchDiaryRange,

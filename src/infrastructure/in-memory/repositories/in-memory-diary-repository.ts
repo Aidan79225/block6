@@ -1,6 +1,6 @@
 import type { DiaryEntry } from "@/domain/entities/diary-entry";
 import type { DiaryRepository } from "@/domain/repositories/diary-repository";
-import { isSameLocalDay } from "@/presentation/lib/date-helpers";
+import { isSameLocalDay } from "@/lib/date-helpers";
 
 export class InMemoryDiaryRepository implements DiaryRepository {
   private readonly byId = new Map<string, DiaryEntry>();
