@@ -191,6 +191,55 @@ export async function updateBlockStatus(
   if (error) throw new Error(error.message);
 }
 
+export async function fetchBlockById(id: string): Promise<Block | null> {
+  const { data, error } = await supabase
+    .from("blocks")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbBlockToEntity(data as DbBlock);
+}
+
+export async function fetchBlocksByWeekPlanId(
+  weekPlanId: string,
+): Promise<Block[]> {
+  const { data, error } = await supabase
+    .from("blocks")
+    .select("*")
+    .eq("week_plan_id", weekPlanId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => dbBlockToEntity(row as DbBlock));
+}
+
+export async function insertBlockRow(block: Block): Promise<void> {
+  const { error } = await supabase.from("blocks").insert({
+    id: block.id,
+    week_plan_id: block.weekPlanId,
+    day_of_week: block.dayOfWeek,
+    slot: block.slot,
+    block_type_id: BLOCK_TYPE_MAP[block.blockType],
+    title: block.title,
+    description: block.description,
+    status: block.status,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateBlockRow(block: Block): Promise<void> {
+  const { error } = await supabase
+    .from("blocks")
+    .update({
+      block_type_id: BLOCK_TYPE_MAP[block.blockType],
+      title: block.title,
+      description: block.description,
+      status: block.status,
+    })
+    .eq("id", block.id);
+  if (error) throw new Error(error.message);
+}
+
 // --- Diary ---
 
 interface DbDiary {
