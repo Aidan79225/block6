@@ -12,6 +12,7 @@ import { createWeeklyTask } from "@/domain/entities/weekly-task";
 import type { TimerSession } from "@/domain/entities/timer-session";
 import { createTimerSession } from "@/domain/entities/timer-session";
 import type { DiaryEntry } from "@/domain/entities/diary-entry";
+import type { WeekPlan } from "@/domain/entities/week-plan";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
@@ -80,6 +81,50 @@ export async function getOrCreateWeekPlan(
 
   if (error) throw new Error(error.message);
   return created!.id;
+}
+
+interface DbWeekPlan {
+  id: string;
+  user_id: string;
+  week_start: string;
+  created_at: string;
+}
+
+function dbWeekPlanToEntity(db: DbWeekPlan): WeekPlan {
+  const [y, m, d] = db.week_start.split("-").map(Number);
+  return {
+    id: db.id,
+    userId: db.user_id,
+    weekStart: new Date(y, m - 1, d),
+    createdAt: new Date(db.created_at),
+  };
+}
+
+export async function fetchWeekPlan(
+  userId: string,
+  weekKey: string,
+): Promise<WeekPlan | null> {
+  const { data, error } = await supabase
+    .from("week_plans")
+    .select("id, user_id, week_start, created_at")
+    .eq("user_id", userId)
+    .eq("week_start", weekKey)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbWeekPlanToEntity(data as DbWeekPlan);
+}
+
+export async function insertWeekPlan(plan: WeekPlan): Promise<void> {
+  const y = plan.weekStart.getFullYear();
+  const m = String(plan.weekStart.getMonth() + 1).padStart(2, "0");
+  const d = String(plan.weekStart.getDate()).padStart(2, "0");
+  const { error } = await supabase.from("week_plans").insert({
+    id: plan.id,
+    user_id: plan.userId,
+    week_start: `${y}-${m}-${d}`,
+  });
+  if (error) throw new Error(error.message);
 }
 
 // --- Blocks ---
