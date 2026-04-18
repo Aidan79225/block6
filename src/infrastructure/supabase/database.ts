@@ -277,6 +277,9 @@ export async function updateBlockRow(block: Block): Promise<void> {
   const { error } = await supabase
     .from("blocks")
     .update({
+      week_plan_id: block.weekPlanId,
+      day_of_week: block.dayOfWeek,
+      slot: block.slot,
       block_type_id: BLOCK_TYPE_MAP[block.blockType],
       title: block.title,
       description: block.description,
@@ -419,9 +422,14 @@ export async function insertDiaryEntry(entry: DiaryEntry): Promise<void> {
 }
 
 export async function updateDiaryEntry(entry: DiaryEntry): Promise<void> {
+  const y = entry.entryDate.getFullYear();
+  const m = String(entry.entryDate.getMonth() + 1).padStart(2, "0");
+  const d = String(entry.entryDate.getDate()).padStart(2, "0");
   const { error } = await supabase
     .from("diary_entries")
     .update({
+      user_id: entry.userId,
+      entry_date: `${y}-${m}-${d}`,
       bad: entry.bad,
       good: entry.good,
       next: entry.next,
