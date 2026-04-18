@@ -11,6 +11,8 @@ import type { WeeklyTask } from "@/domain/entities/weekly-task";
 import { createWeeklyTask } from "@/domain/entities/weekly-task";
 import type { TimerSession } from "@/domain/entities/timer-session";
 import { createTimerSession } from "@/domain/entities/timer-session";
+import type { DiaryEntry } from "@/domain/entities/diary-entry";
+import type { WeekPlan } from "@/domain/entities/week-plan";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
@@ -79,6 +81,50 @@ export async function getOrCreateWeekPlan(
 
   if (error) throw new Error(error.message);
   return created!.id;
+}
+
+interface DbWeekPlan {
+  id: string;
+  user_id: string;
+  week_start: string;
+  created_at: string;
+}
+
+function dbWeekPlanToEntity(db: DbWeekPlan): WeekPlan {
+  const [y, m, d] = db.week_start.split("-").map(Number);
+  return {
+    id: db.id,
+    userId: db.user_id,
+    weekStart: new Date(y, m - 1, d),
+    createdAt: new Date(db.created_at),
+  };
+}
+
+export async function fetchWeekPlan(
+  userId: string,
+  weekKey: string,
+): Promise<WeekPlan | null> {
+  const { data, error } = await supabase
+    .from("week_plans")
+    .select("id, user_id, week_start, created_at")
+    .eq("user_id", userId)
+    .eq("week_start", weekKey)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbWeekPlanToEntity(data as DbWeekPlan);
+}
+
+export async function insertWeekPlan(plan: WeekPlan): Promise<void> {
+  const y = plan.weekStart.getFullYear();
+  const m = String(plan.weekStart.getMonth() + 1).padStart(2, "0");
+  const d = String(plan.weekStart.getDate()).padStart(2, "0");
+  const { error } = await supabase.from("week_plans").insert({
+    id: plan.id,
+    user_id: plan.userId,
+    week_start: `${y}-${m}-${d}`,
+  });
+  if (error) throw new Error(error.message);
 }
 
 // --- Blocks ---
@@ -191,6 +237,58 @@ export async function updateBlockStatus(
   if (error) throw new Error(error.message);
 }
 
+export async function fetchBlockById(id: string): Promise<Block | null> {
+  const { data, error } = await supabase
+    .from("blocks")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbBlockToEntity(data as DbBlock);
+}
+
+export async function fetchBlocksByWeekPlanId(
+  weekPlanId: string,
+): Promise<Block[]> {
+  const { data, error } = await supabase
+    .from("blocks")
+    .select("*")
+    .eq("week_plan_id", weekPlanId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => dbBlockToEntity(row as DbBlock));
+}
+
+export async function insertBlockRow(block: Block): Promise<void> {
+  const { error } = await supabase.from("blocks").insert({
+    id: block.id,
+    week_plan_id: block.weekPlanId,
+    day_of_week: block.dayOfWeek,
+    slot: block.slot,
+    block_type_id: BLOCK_TYPE_MAP[block.blockType],
+    title: block.title,
+    description: block.description,
+    status: block.status,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateBlockRow(block: Block): Promise<void> {
+  const { error } = await supabase
+    .from("blocks")
+    .update({
+      week_plan_id: block.weekPlanId,
+      day_of_week: block.dayOfWeek,
+      slot: block.slot,
+      block_type_id: BLOCK_TYPE_MAP[block.blockType],
+      title: block.title,
+      description: block.description,
+      status: block.status,
+    })
+    .eq("id", block.id);
+  if (error) throw new Error(error.message);
+}
+
 // --- Diary ---
 
 interface DbDiary {
@@ -255,6 +353,91 @@ export async function upsertDiary(
   }
 }
 
+interface DbDiaryFull {
+  id: string;
+  user_id: string;
+  entry_date: string;
+  bad: string;
+  good: string;
+  next: string;
+  created_at: string;
+}
+
+function dbDiaryToEntity(db: DbDiaryFull): DiaryEntry {
+  const [y, m, d] = db.entry_date.split("-").map(Number);
+  return {
+    id: db.id,
+    userId: db.user_id,
+    entryDate: new Date(y, m - 1, d),
+    bad: db.bad,
+    good: db.good,
+    next: db.next,
+    createdAt: new Date(db.created_at),
+  };
+}
+
+export async function fetchDiaryEntry(
+  userId: string,
+  dateKey: string,
+): Promise<DiaryEntry | null> {
+  const { data, error } = await supabase
+    .from("diary_entries")
+    .select("id, user_id, entry_date, bad, good, next, created_at")
+    .eq("user_id", userId)
+    .eq("entry_date", dateKey)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbDiaryToEntity(data as DbDiaryFull);
+}
+
+export async function fetchDiaryRange(
+  userId: string,
+  startKey: string,
+  endKey: string,
+): Promise<DiaryEntry[]> {
+  const { data, error } = await supabase
+    .from("diary_entries")
+    .select("id, user_id, entry_date, bad, good, next, created_at")
+    .eq("user_id", userId)
+    .gte("entry_date", startKey)
+    .lte("entry_date", endKey);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => dbDiaryToEntity(row as DbDiaryFull));
+}
+
+export async function insertDiaryEntry(entry: DiaryEntry): Promise<void> {
+  const y = entry.entryDate.getFullYear();
+  const m = String(entry.entryDate.getMonth() + 1).padStart(2, "0");
+  const d = String(entry.entryDate.getDate()).padStart(2, "0");
+  const { error } = await supabase.from("diary_entries").insert({
+    id: entry.id,
+    user_id: entry.userId,
+    entry_date: `${y}-${m}-${d}`,
+    bad: entry.bad,
+    good: entry.good,
+    next: entry.next,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateDiaryEntry(entry: DiaryEntry): Promise<void> {
+  const y = entry.entryDate.getFullYear();
+  const m = String(entry.entryDate.getMonth() + 1).padStart(2, "0");
+  const d = String(entry.entryDate.getDate()).padStart(2, "0");
+  const { error } = await supabase
+    .from("diary_entries")
+    .update({
+      user_id: entry.userId,
+      entry_date: `${y}-${m}-${d}`,
+      bad: entry.bad,
+      good: entry.good,
+      next: entry.next,
+    })
+    .eq("id", entry.id);
+  if (error) throw new Error(error.message);
+}
+
 // --- Week Reviews ---
 
 export async function fetchReflection(
@@ -304,6 +487,58 @@ export async function upsertReflection(
       .insert({ week_plan_id: weekPlanId, reflection });
     if (error) throw new Error(error.message);
   }
+}
+
+interface DbWeekReview {
+  id: string;
+  week_plan_id: string;
+  reflection: string;
+  created_at: string;
+}
+
+function dbWeekReviewToEntity(
+  db: DbWeekReview,
+): import("@/domain/entities/week-review").WeekReview {
+  return {
+    id: db.id,
+    weekPlanId: db.week_plan_id,
+    reflection: db.reflection,
+    createdAt: new Date(db.created_at),
+  };
+}
+
+export async function fetchWeekReviewByWeekPlanId(
+  weekPlanId: string,
+): Promise<import("@/domain/entities/week-review").WeekReview | null> {
+  const { data, error } = await supabase
+    .from("week_reviews")
+    .select("id, week_plan_id, reflection, created_at")
+    .eq("week_plan_id", weekPlanId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbWeekReviewToEntity(data as DbWeekReview);
+}
+
+export async function insertWeekReview(
+  review: import("@/domain/entities/week-review").WeekReview,
+): Promise<void> {
+  const { error } = await supabase.from("week_reviews").insert({
+    id: review.id,
+    week_plan_id: review.weekPlanId,
+    reflection: review.reflection,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateWeekReview(
+  review: import("@/domain/entities/week-review").WeekReview,
+): Promise<void> {
+  const { error } = await supabase
+    .from("week_reviews")
+    .update({ reflection: review.reflection })
+    .eq("id", review.id);
+  if (error) throw new Error(error.message);
 }
 
 // --- Subtasks ---

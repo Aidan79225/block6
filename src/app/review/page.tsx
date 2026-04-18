@@ -18,7 +18,7 @@ import { WeekNavigator } from "@/presentation/components/header/week-navigator";
 import {
   getCellDate,
   formatDateKey,
-} from "@/presentation/lib/date-helpers";
+} from "@/lib/date-helpers";
 
 export default function ReviewPage() {
   const { user } = useAuth();

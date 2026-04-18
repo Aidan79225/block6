@@ -4,7 +4,7 @@ import {
   getCellDate,
   formatDateKey,
   isSameLocalDay,
-} from "@/presentation/lib/date-helpers";
+} from "@/lib/date-helpers";
 
 describe("date-helpers", () => {
   describe("getMonday", () => {
