@@ -481,6 +481,58 @@ export async function upsertReflection(
   }
 }
 
+interface DbWeekReview {
+  id: string;
+  week_plan_id: string;
+  reflection: string;
+  created_at: string;
+}
+
+function dbWeekReviewToEntity(
+  db: DbWeekReview,
+): import("@/domain/entities/week-review").WeekReview {
+  return {
+    id: db.id,
+    weekPlanId: db.week_plan_id,
+    reflection: db.reflection,
+    createdAt: new Date(db.created_at),
+  };
+}
+
+export async function fetchWeekReviewByWeekPlanId(
+  weekPlanId: string,
+): Promise<import("@/domain/entities/week-review").WeekReview | null> {
+  const { data, error } = await supabase
+    .from("week_reviews")
+    .select("id, week_plan_id, reflection, created_at")
+    .eq("week_plan_id", weekPlanId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbWeekReviewToEntity(data as DbWeekReview);
+}
+
+export async function insertWeekReview(
+  review: import("@/domain/entities/week-review").WeekReview,
+): Promise<void> {
+  const { error } = await supabase.from("week_reviews").insert({
+    id: review.id,
+    week_plan_id: review.weekPlanId,
+    reflection: review.reflection,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateWeekReview(
+  review: import("@/domain/entities/week-review").WeekReview,
+): Promise<void> {
+  const { error } = await supabase
+    .from("week_reviews")
+    .update({ reflection: review.reflection })
+    .eq("id", review.id);
+  if (error) throw new Error(error.message);
+}
+
 // --- Subtasks ---
 
 interface DbSubtask {
