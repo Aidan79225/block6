@@ -16,12 +16,12 @@ import { BlockType, BlockStatus, createBlock } from "@/domain/entities/block";
 import type { WeeklyTask } from "@/domain/entities/weekly-task";
 import { useAuth } from "./auth-provider";
 import { useNotify } from "./notification-provider";
+import { useUseCases } from "@/presentation/providers/dependency-provider";
 import type { Subtask } from "@/domain/entities/subtask";
 import type { TimerSession } from "@/domain/entities/timer-session";
 import {
   fetchBlocksForWeek,
   upsertBlock,
-  updateBlockStatus,
   fetchDiary,
   upsertDiary,
   fetchReflection,
@@ -291,6 +291,7 @@ const PLAN_CHANGES_STORAGE_KEY = (userIdOrAnon: string) =>
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const notify = useNotify();
+  const useCases = useUseCases();
 
   // SSR-safe read of localStorage
   const localData = useSyncExternalStore(
@@ -574,7 +575,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             b.id === blockId ? createBlock({ ...b, status }) : b,
           ),
         );
-        updateBlockStatus(blockId, status).catch((err) => {
+        useCases.updateBlockStatus.execute(blockId, status).catch((err) => {
           console.error(err);
           notify.error("狀態更新失敗");
         });
@@ -586,7 +587,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveToStorage(current);
       }
     },
-    [user, notify],
+    [user, notify, useCases],
   );
 
   const copyPreviousWeekPlan = useCallback(
