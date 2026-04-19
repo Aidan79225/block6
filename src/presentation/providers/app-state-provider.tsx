@@ -598,60 +598,66 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       prev.setDate(prev.getDate() - 7);
       const previousWeekKey = formatDateKey(prev);
 
-      const prevBlocks = await fetchBlocksForWeek(user.id, previousWeekKey);
-      if (prevBlocks.length === 0) return 0;
+      try {
+        const prevBlocks = await fetchBlocksForWeek(user.id, previousWeekKey);
+        if (prevBlocks.length === 0) return 0;
 
-      const prevSubtasks = await fetchSubtasksForBlocks(
-        prevBlocks.map((b) => b.id),
-      );
-      const subtasksByBlock = new Map<string, typeof prevSubtasks>();
-      for (const s of prevSubtasks) {
-        const list = subtasksByBlock.get(s.blockId) ?? [];
-        list.push(s);
-        subtasksByBlock.set(s.blockId, list);
-      }
-
-      const currentBlocks = supaBlocks.filter(
-        (b) => b.weekPlanId === currentWeekKey,
-      );
-      const occupied = new Set(
-        currentBlocks.map((b) => `${b.dayOfWeek}-${b.slot}`),
-      );
-
-      let inserted = 0;
-      for (const prevBlock of prevBlocks) {
-        const key = `${prevBlock.dayOfWeek}-${prevBlock.slot}`;
-        if (occupied.has(key)) continue;
-
-        const saved = await upsertBlock(
-          user.id,
-          currentWeekKey,
-          prevBlock.dayOfWeek,
-          prevBlock.slot,
-          prevBlock.blockType,
-          prevBlock.title,
-          prevBlock.description,
+        const prevSubtasks = await fetchSubtasksForBlocks(
+          prevBlocks.map((b) => b.id),
         );
-
-        const subtasksToCopy = (
-          subtasksByBlock.get(prevBlock.id) ?? []
-        ).slice();
-        subtasksToCopy.sort((a, b) => a.position - b.position);
-        for (let i = 0; i < subtasksToCopy.length; i++) {
-          const st = subtasksToCopy[i];
-          await dbAddSubtask(saved.id, st.title, i);
+        const subtasksByBlock = new Map<string, typeof prevSubtasks>();
+        for (const s of prevSubtasks) {
+          const list = subtasksByBlock.get(s.blockId) ?? [];
+          list.push(s);
+          subtasksByBlock.set(s.blockId, list);
         }
 
-        inserted++;
+        // Use DB as source of truth for what's currently occupied.
+        // Local `supaBlocks` can be stale after a prior failed copy, which
+        // would let `upsertBlock` land on an existing row and collide on
+        // `unique(block_id, position)` when re-inserting subtasks.
+        const currentBlocksInDb = await fetchBlocksForWeek(
+          user.id,
+          currentWeekKey,
+        );
+        const occupied = new Set(
+          currentBlocksInDb.map((b) => `${b.dayOfWeek}-${b.slot}`),
+        );
+
+        let inserted = 0;
+        for (const prevBlock of prevBlocks) {
+          const key = `${prevBlock.dayOfWeek}-${prevBlock.slot}`;
+          if (occupied.has(key)) continue;
+
+          const saved = await upsertBlock(
+            user.id,
+            currentWeekKey,
+            prevBlock.dayOfWeek,
+            prevBlock.slot,
+            prevBlock.blockType,
+            prevBlock.title,
+            prevBlock.description,
+          );
+
+          const subtasksToCopy = (
+            subtasksByBlock.get(prevBlock.id) ?? []
+          ).slice();
+          subtasksToCopy.sort((a, b) => a.position - b.position);
+          for (let i = 0; i < subtasksToCopy.length; i++) {
+            const st = subtasksToCopy[i];
+            await dbAddSubtask(saved.id, st.title, i);
+          }
+
+          inserted++;
+        }
+
+        return inserted;
+      } finally {
+        loadedWeeks.current.delete(currentWeekKey);
+        loadWeek(currentWeekKey);
       }
-
-      // Force re-fetch of this week's data
-      loadedWeeks.current.delete(currentWeekKey);
-      loadWeek(currentWeekKey);
-
-      return inserted;
     },
-    [user, supaBlocks, loadWeek],
+    [user, loadWeek],
   );
 
   const swapBlocks = useCallback(
