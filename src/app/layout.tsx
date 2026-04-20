@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthProvider } from "@/presentation/providers/auth-provider";
 import { AppStateProvider } from "@/presentation/providers/app-state-provider";
 import { NotificationProvider } from "@/presentation/providers/notification-provider";
+import { ProductionDependencyProvider } from "@/presentation/providers/production-dependency-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,7 +20,9 @@ export default function RootLayout({
       <body>
         <NotificationProvider>
           <AuthProvider>
-            <AppStateProvider>{children}</AppStateProvider>
+            <ProductionDependencyProvider>
+              <AppStateProvider>{children}</AppStateProvider>
+            </ProductionDependencyProvider>
           </AuthProvider>
         </NotificationProvider>
       </body>
