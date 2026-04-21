@@ -54,6 +54,7 @@ export function ReflectionEditor({
       <button
         onClick={() => onSave(reflection)}
         disabled={!isValid}
+        suppressHydrationWarning
         style={{
           marginTop: "12px",
           background: isValid
