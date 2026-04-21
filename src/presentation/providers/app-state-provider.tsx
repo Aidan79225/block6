@@ -57,7 +57,6 @@ import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
 import { formatDateKey, parseDateKey } from "@/lib/date-helpers";
 
 interface AppState {
-  allBlocks: Block[];
   getBlocksForWeek: (weekKey: string) => Block[];
   saveBlock: (
     weekKey: string,
@@ -301,7 +300,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Supabase-sourced state (only used when logged in)
-  const [supaBlocks, setSupaBlocks] = useState<Block[]>([]);
+  const [supaBlocks, setSupaBlocks] = useState<Record<string, Block[]>>({});
   const [supaDiary, setSupaDiary] = useState<Record<string, DiaryLines>>({});
   const supaDiaryRef = useRef(supaDiary);
   useEffect(() => {
@@ -328,21 +327,33 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const isLoggedIn = !authLoading && !!user;
 
   // Pick data source based on auth state
-  const blocks = isLoggedIn ? supaBlocks : localData.blocks;
+  const localBlocksByWeek = useMemo(() => {
+    const out: Record<string, Block[]> = {};
+    for (const b of localData.blocks) {
+      (out[b.weekPlanId] ??= []).push(b);
+    }
+    return out;
+  }, [localData.blocks]);
+
+  const blocksByWeek: Record<string, Block[]> = isLoggedIn
+    ? supaBlocks
+    : localBlocksByWeek;
   const diaryEntries = isLoggedIn ? supaDiary : localData.diaryEntries;
   const reflection = isLoggedIn ? supaReflection : localData.reflection;
 
   const taskTitleSuggestions = useMemo<TitleSuggestion[]>(() => {
     const counts = new Map<string, number>();
-    for (const b of blocks) {
-      const title = b.title.trim();
-      if (!title) continue;
-      counts.set(title, (counts.get(title) ?? 0) + 1);
+    for (const list of Object.values(blocksByWeek)) {
+      for (const b of list) {
+        const title = b.title.trim();
+        if (!title) continue;
+        counts.set(title, (counts.get(title) ?? 0) + 1);
+      }
     }
     return Array.from(counts.entries())
       .map(([title, count]) => ({ title, count }))
       .sort((a, b) => b.count - a.count);
-  }, [blocks]);
+  }, [blocksByWeek]);
 
   // Migrate local data to Supabase on first login
   useEffect(() => {
@@ -396,12 +407,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       loadedWeeks.current.add(weekKey);
       fetchBlocksForWeek(user.id, weekKey)
         .then(async (fetched) => {
-          setSupaBlocks((prev) => {
-            const withoutThisWeek = prev.filter(
-              (b) => b.weekPlanId !== weekKey,
-            );
-            return [...withoutThisWeek, ...fetched];
-          });
+          setSupaBlocks((prev) => ({ ...prev, [weekKey]: fetched }));
           if (fetched.length > 0) {
             const ids = fetched.map((b) => b.id);
             const [fetchedSubs, fetchedSessions] = await Promise.all([
@@ -456,9 +462,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const getBlocksForWeek = useCallback(
     (weekKey: string): Block[] => {
-      return blocks.filter((b) => b.weekPlanId === weekKey);
+      return blocksByWeek[weekKey] ?? [];
     },
-    [blocks],
+    [blocksByWeek],
   );
 
   const saveBlock = useCallback(
@@ -482,11 +488,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         let resultBlock: Block | null = null;
         setSupaBlocks((prev) => {
-          const existing = prev.find(
-            (b) =>
-              b.weekPlanId === weekKey &&
-              b.dayOfWeek === dayOfWeek &&
-              b.slot === slot,
+          const weekBlocks = prev[weekKey] ?? [];
+          const existing = weekBlocks.find(
+            (b) => b.dayOfWeek === dayOfWeek && b.slot === slot,
           );
           if (existing) {
             const updated = createBlock({
@@ -496,7 +500,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
               blockType,
             });
             resultBlock = updated;
-            return prev.map((b) => (b.id === existing.id ? updated : b));
+            return {
+              ...prev,
+              [weekKey]: weekBlocks.map((b) =>
+                b.id === existing.id ? updated : b,
+              ),
+            };
           }
           const created = createBlock({
             id: crypto.randomUUID(),
@@ -504,7 +513,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             status: BlockStatus.Planned,
           });
           resultBlock = created;
-          return [...prev, created];
+          return { ...prev, [weekKey]: [...weekBlocks, created] };
         });
 
         upsertBlock(
@@ -517,15 +526,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           description,
         )
           .then((saved) => {
-            setSupaBlocks((prev) =>
-              prev.map((b) =>
-                b.weekPlanId === weekKey &&
-                b.dayOfWeek === dayOfWeek &&
-                b.slot === slot
-                  ? saved
-                  : b,
+            setSupaBlocks((prev) => ({
+              ...prev,
+              [weekKey]: (prev[weekKey] ?? []).map((b) =>
+                b.dayOfWeek === dayOfWeek && b.slot === slot ? saved : b,
               ),
-            );
+            }));
           })
           .catch((err) => {
             console.error(err);
@@ -570,11 +576,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const updateStatus = useCallback(
     (blockId: string, status: BlockStatus) => {
       if (user) {
-        setSupaBlocks((prev) =>
-          prev.map((b) =>
-            b.id === blockId ? createBlock({ ...b, status }) : b,
-          ),
-        );
+        setSupaBlocks((prev) => {
+          const out: Record<string, Block[]> = {};
+          for (const [wk, list] of Object.entries(prev)) {
+            out[wk] = list.map((b) =>
+              b.id === blockId ? createBlock({ ...b, status }) : b,
+            );
+          }
+          return out;
+        });
         useCases.updateBlockStatus.execute(blockId, status).catch((err) => {
           console.error(err);
           notify.error("狀態更新失敗");
@@ -664,26 +674,31 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const swapBlocks = useCallback(
     async (idA: string, idB: string) => {
       setSupaBlocks((prev) => {
-        const a = prev.find((b) => b.id === idA);
-        const b = prev.find((b) => b.id === idB);
+        const flat = Object.values(prev).flat();
+        const a = flat.find((b) => b.id === idA);
+        const b = flat.find((b) => b.id === idB);
         if (!a || !b) return prev;
-        return prev.map((block) => {
-          if (block.id === idA) {
-            return createBlock({
-              ...block,
-              dayOfWeek: b.dayOfWeek,
-              slot: b.slot,
-            });
-          }
-          if (block.id === idB) {
-            return createBlock({
-              ...block,
-              dayOfWeek: a.dayOfWeek,
-              slot: a.slot,
-            });
-          }
-          return block;
-        });
+        const out: Record<string, Block[]> = {};
+        for (const [wk, list] of Object.entries(prev)) {
+          out[wk] = list.map((block) => {
+            if (block.id === idA) {
+              return createBlock({
+                ...block,
+                dayOfWeek: b.dayOfWeek,
+                slot: b.slot,
+              });
+            }
+            if (block.id === idB) {
+              return createBlock({
+                ...block,
+                dayOfWeek: a.dayOfWeek,
+                slot: a.slot,
+              });
+            }
+            return block;
+          });
+        }
+        return out;
       });
       if (user) {
         try {
@@ -699,11 +714,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const moveBlock = useCallback(
     async (id: string, dayOfWeek: number, slot: number) => {
-      setSupaBlocks((prev) =>
-        prev.map((block) =>
-          block.id === id ? createBlock({ ...block, dayOfWeek, slot }) : block,
-        ),
-      );
+      setSupaBlocks((prev) => {
+        const out: Record<string, Block[]> = {};
+        for (const [wk, list] of Object.entries(prev)) {
+          out[wk] = list.map((block) =>
+            block.id === id ? createBlock({ ...block, dayOfWeek, slot }) : block,
+          );
+        }
+        return out;
+      });
       if (user) {
         try {
           await moveBlockInDb(id, dayOfWeek, slot);
@@ -1025,7 +1044,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const getTaskTimeRanking = useCallback(
     (weekKey: string, now: Date) => {
-      const weekBlocks = blocks.filter((b) => b.weekPlanId === weekKey);
+      const weekBlocks = blocksByWeek[weekKey] ?? [];
       const titleByBlockId = new Map<string, string>();
       for (const b of weekBlocks) {
         if (b.title.trim()) titleByBlockId.set(b.id, b.title.trim());
@@ -1047,7 +1066,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         .map(([title, totalSeconds]) => ({ title, totalSeconds }))
         .sort((a, b) => b.totalSeconds - a.totalSeconds);
     },
-    [blocks, timerSessions],
+    [blocksByWeek, timerSessions],
   );
 
   const getElapsedSeconds = useCallback(
@@ -1161,7 +1180,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppStateContext.Provider
       value={{
-        allBlocks: blocks,
         getBlocksForWeek,
         saveBlock,
         updateStatus,
