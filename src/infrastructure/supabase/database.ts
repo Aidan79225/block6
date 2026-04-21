@@ -148,11 +148,7 @@ export async function fetchBlocksForWeek(
     .eq("week_plan_id", plan.id);
 
   if (error) throw new Error(error.message);
-  return (data as DbBlock[]).map((db) => {
-    const block = dbBlockToEntity(db);
-    // Use weekStart (date string) as weekPlanId for consistency with local mode
-    return createBlock({ ...block, weekPlanId: weekStart });
-  });
+  return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
 }
 
 export async function upsertBlock(
@@ -201,8 +197,7 @@ export async function upsertBlock(
 
     console.log("[BLOCK6] update result:", { data, error });
     if (error) throw new Error(error.message);
-    const updated = dbBlockToEntity(data as DbBlock);
-    return createBlock({ ...updated, weekPlanId: weekStart });
+    return dbBlockToEntity(data as DbBlock);
   }
 
   const { data, error } = await supabase
@@ -221,8 +216,7 @@ export async function upsertBlock(
 
   console.log("[BLOCK6] insert result:", { data, error });
   if (error) throw new Error(error.message);
-  const inserted = dbBlockToEntity(data as DbBlock);
-  return createBlock({ ...inserted, weekPlanId: weekStart });
+  return dbBlockToEntity(data as DbBlock);
 }
 
 export async function updateBlockStatus(
