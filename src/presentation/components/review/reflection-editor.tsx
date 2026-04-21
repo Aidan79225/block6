@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface ReflectionEditorProps {
   reflection: string;
@@ -11,6 +11,11 @@ export function ReflectionEditor({
   onSave,
 }: ReflectionEditorProps) {
   const [reflection, setReflection] = useState(initialReflection);
+  const isValid = reflection.trim() !== "";
+
+  useEffect(() => {
+    setReflection(initialReflection);
+  }, [initialReflection]);
   return (
     <div
       style={{
@@ -48,14 +53,17 @@ export function ReflectionEditor({
       />
       <button
         onClick={() => onSave(reflection)}
+        disabled={!isValid}
         style={{
           marginTop: "12px",
-          background: "var(--color-accent)",
+          background: isValid
+            ? "var(--color-accent)"
+            : "var(--color-bg-tertiary)",
           border: "none",
           borderRadius: "var(--radius-sm)",
-          color: "white",
+          color: isValid ? "white" : "var(--color-text-muted)",
           padding: "8px 20px",
-          cursor: "pointer",
+          cursor: isValid ? "pointer" : "not-allowed",
           fontSize: "14px",
           fontWeight: 600,
         }}
