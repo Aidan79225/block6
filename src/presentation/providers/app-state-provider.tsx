@@ -21,6 +21,7 @@ import type { Subtask } from "@/domain/entities/subtask";
 import type { TimerSession } from "@/domain/entities/timer-session";
 import {
   fetchBlocksForWeek,
+  getOrCreateWeekPlan,
   upsertBlock,
   fetchDiary,
   upsertDiary,
@@ -516,15 +517,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           return { ...prev, [weekKey]: [...weekBlocks, created] };
         });
 
-        upsertBlock(
-          user.id,
-          weekKey,
-          dayOfWeek,
-          slot,
-          blockType,
-          title,
-          description,
-        )
+        getOrCreateWeekPlan(user.id, weekKey)
+          .then((weekPlanId) =>
+            useCases.updateBlock.execute({
+              weekPlanId,
+              dayOfWeek,
+              slot,
+              blockType,
+              title,
+              description,
+            }),
+          )
           .then((saved) => {
             setSupaBlocks((prev) => ({
               ...prev,
@@ -570,7 +573,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         return resultBlock;
       }
     },
-    [user, notify],
+    [user, notify, useCases],
   );
 
   const updateStatus = useCallback(
