@@ -158,11 +158,7 @@ export default function ReviewPage() {
       <TaskTimeRanking items={ranking} />
       <DiaryWeekView entries={weekDiaries} />
       <PlanChangesLog changes={weekChanges} />
-      <ReflectionEditor
-        key={weekKey}
-        reflection={reflection}
-        onSave={handleSaveReflection}
-      />
+      <ReflectionEditor reflection={reflection} onSave={handleSaveReflection} />
     </div>
   );
 }

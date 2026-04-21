@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface ReflectionEditorProps {
   reflection: string;
@@ -11,6 +11,9 @@ export function ReflectionEditor({
   onSave,
 }: ReflectionEditorProps) {
   const [reflection, setReflection] = useState(initialReflection);
+  useEffect(() => {
+    setReflection(initialReflection);
+  }, [initialReflection]);
   const isValid = reflection.trim() !== "";
 
   return (
