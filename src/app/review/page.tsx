@@ -11,8 +11,9 @@ import { PlanChangesLog } from "@/presentation/components/review/plan-changes-lo
 import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
+import { useUseCases } from "@/presentation/providers/dependency-provider";
 import { BlockStatus, BlockType } from "@/domain/entities/block";
-import { upsertReflection } from "@/infrastructure/supabase/database";
+import { getOrCreateWeekPlan } from "@/infrastructure/supabase/database";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { WeekNavigator } from "@/presentation/components/header/week-navigator";
 import {
@@ -24,6 +25,7 @@ export default function ReviewPage() {
   const { user } = useAuth();
   const notify = useNotify();
   const { weekStart, goToPreviousWeek, goToNextWeek } = useWeekPlan();
+  const useCases = useUseCases();
   const {
     getBlocksForWeek,
     reflection,
@@ -96,10 +98,14 @@ export default function ReviewPage() {
   const handleSaveReflection = (text: string) => {
     setReflection(text);
     if (user) {
-      upsertReflection(user.id, weekKey, text).catch((err) => {
-        console.error(err);
-        notify.error("反思儲存失敗");
-      });
+      getOrCreateWeekPlan(user.id, weekKey)
+        .then((weekPlanId) =>
+          useCases.createWeekReview.execute(weekPlanId, text),
+        )
+        .catch((err) => {
+          console.error(err);
+          notify.error("反思儲存失敗");
+        });
     }
   };
 
