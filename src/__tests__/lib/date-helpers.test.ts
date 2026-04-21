@@ -4,6 +4,7 @@ import {
   getCellDate,
   formatDateKey,
   isSameLocalDay,
+  parseDateKey,
 } from "@/lib/date-helpers";
 
 describe("date-helpers", () => {
@@ -85,6 +86,32 @@ describe("date-helpers", () => {
       const lateMon = new Date(2026, 3, 13, 23, 59);
       const earlyTue = new Date(2026, 3, 14, 0, 1);
       expect(isSameLocalDay(lateMon, earlyTue)).toBe(false);
+    });
+  });
+
+  describe("parseDateKey", () => {
+    it("parses YYYY-MM-DD to a Date at local midnight with matching Y/M/D", () => {
+      const d = parseDateKey("2026-04-13");
+      expect(d.getFullYear()).toBe(2026);
+      expect(d.getMonth()).toBe(3); // zero-indexed April
+      expect(d.getDate()).toBe(13);
+      expect(d.getHours()).toBe(0);
+      expect(d.getMinutes()).toBe(0);
+      expect(d.getSeconds()).toBe(0);
+      expect(d.getMilliseconds()).toBe(0);
+    });
+
+    it("handles zero-padded month and day", () => {
+      const d = parseDateKey("2026-01-05");
+      expect(d.getMonth()).toBe(0);
+      expect(d.getDate()).toBe(5);
+    });
+
+    it("round-trips with formatDateKey", () => {
+      const samples = ["2026-01-05", "2026-04-13", "2026-12-31"];
+      for (const k of samples) {
+        expect(formatDateKey(parseDateKey(k))).toBe(k);
+      }
     });
   });
 });
