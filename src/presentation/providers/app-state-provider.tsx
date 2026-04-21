@@ -54,7 +54,7 @@ import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
-import { formatDateKey } from "@/lib/date-helpers";
+import { formatDateKey, parseDateKey } from "@/lib/date-helpers";
 
 interface AppState {
   allBlocks: Block[];
@@ -723,17 +723,25 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           [dateKey]: { bad, good, next },
         }));
-        upsertDiary(user.id, dateKey, bad, good, next).catch((err) => {
-          console.error(err);
-          notify.error("日記儲存失敗");
-        });
+        useCases.writeDiary
+          .execute({
+            userId: user.id,
+            entryDate: parseDateKey(dateKey),
+            bad,
+            good,
+            next,
+          })
+          .catch((err) => {
+            console.error(err);
+            notify.error("日記儲存失敗");
+          });
       } else {
         const current = loadFromStorage();
         current.diaryEntries[dateKey] = { bad, good, next };
         saveToStorage(current);
       }
     },
-    [user, notify],
+    [user, notify, useCases],
   );
 
   const getDiary = useCallback(
