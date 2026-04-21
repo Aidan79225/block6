@@ -13,6 +13,7 @@ import type { TimerSession } from "@/domain/entities/timer-session";
 import { createTimerSession } from "@/domain/entities/timer-session";
 import type { DiaryEntry } from "@/domain/entities/diary-entry";
 import type { WeekPlan } from "@/domain/entities/week-plan";
+import { parseDateKey } from "@/lib/date-helpers";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
@@ -91,11 +92,10 @@ interface DbWeekPlan {
 }
 
 function dbWeekPlanToEntity(db: DbWeekPlan): WeekPlan {
-  const [y, m, d] = db.week_start.split("-").map(Number);
   return {
     id: db.id,
     userId: db.user_id,
-    weekStart: new Date(y, m - 1, d),
+    weekStart: parseDateKey(db.week_start),
     createdAt: new Date(db.created_at),
   };
 }
@@ -364,11 +364,10 @@ interface DbDiaryFull {
 }
 
 function dbDiaryToEntity(db: DbDiaryFull): DiaryEntry {
-  const [y, m, d] = db.entry_date.split("-").map(Number);
   return {
     id: db.id,
     userId: db.user_id,
-    entryDate: new Date(y, m - 1, d),
+    entryDate: parseDateKey(db.entry_date),
     bad: db.bad,
     good: db.good,
     next: db.next,
