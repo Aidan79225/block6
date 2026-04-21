@@ -7,9 +7,7 @@ describe("ReflectionEditor", () => {
   it("disables 儲存反思 button when reflection is empty or whitespace", async () => {
     const user = userEvent.setup();
 
-    const { rerender } = render(
-      <ReflectionEditor reflection="" onSave={() => {}} />,
-    );
+    render(<ReflectionEditor reflection="" onSave={() => {}} />);
     const button = () => screen.getByRole("button", { name: /儲存反思/ });
 
     expect(button()).toBeDisabled();
@@ -22,8 +20,5 @@ describe("ReflectionEditor", () => {
 
     await user.type(screen.getByRole("textbox"), "   ");
     expect(button()).toBeDisabled();
-
-    rerender(<ReflectionEditor reflection="from props" onSave={() => {}} />);
-    expect(button()).not.toBeDisabled();
   });
 });
