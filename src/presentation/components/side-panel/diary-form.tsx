@@ -31,6 +31,8 @@ export function DiaryForm({
   const values = { bad, good, next };
   const setters = { bad: setBad, good: setGood, next: setNext };
 
+  const isValid = bad.trim() !== "" && good.trim() !== "" && next.trim() !== "";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       <label
@@ -74,14 +76,15 @@ export function DiaryForm({
       ))}
       <button
         onClick={() => onSave(bad, good, next)}
+        disabled={!isValid}
         aria-label="儲存"
         style={{
-          background: "var(--color-accent)",
+          background: isValid ? "var(--color-accent)" : "var(--color-bg-tertiary)",
           border: "none",
           borderRadius: "var(--radius-sm)",
-          color: "white",
+          color: isValid ? "white" : "var(--color-text-muted)",
           padding: "8px 16px",
-          cursor: "pointer",
+          cursor: isValid ? "pointer" : "not-allowed",
           fontSize: "14px",
           fontWeight: 600,
           alignSelf: "flex-end",
