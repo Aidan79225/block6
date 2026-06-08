@@ -91,6 +91,9 @@ export default function DashboardPage() {
     copyPreviousWeekPlan,
     addPlanChange,
     loadPlanChanges,
+    keyResultOptions,
+    loadKeyResultOptions,
+    linkBlockToKeyResult,
   } = useAppState();
   const notify = useNotify();
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -231,6 +234,10 @@ export default function DashboardPage() {
   useEffect(() => {
     loadPlanChanges(weekKey);
   }, [weekKey, loadPlanChanges]);
+
+  useEffect(() => {
+    loadKeyResultOptions(weekStart);
+  }, [weekStart, loadKeyResultOptions]);
 
   // Force a re-render every second while a timer is running
   useEffect(() => {
@@ -585,6 +592,11 @@ export default function DashboardPage() {
               if (selectedBlock) clearTimer(selectedBlock.id);
             }}
             onClose={() => setSelection(null)}
+            keyResultOptions={keyResultOptions}
+            onLinkBlockKeyResult={(keyResultId) => {
+              if (selectedBlock)
+                linkBlockToKeyResult(selectedBlock.id, keyResultId);
+            }}
           />
         )}
       </div>

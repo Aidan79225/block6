@@ -35,6 +35,8 @@ function makeProps(overrides: Partial<SidePanelProps> = {}): SidePanelProps {
     onAddManualTimer: noop,
     onClearTimer: noop,
     onClose: noop,
+    keyResultOptions: [],
+    onLinkBlockKeyResult: noop,
     ...overrides,
   };
 }

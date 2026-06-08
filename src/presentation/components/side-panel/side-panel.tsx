@@ -35,6 +35,12 @@ interface SidePanelProps {
   onAddManualTimer: (startedAt: Date, endedAt: Date) => void;
   onClearTimer: () => void;
   onClose: () => void;
+  keyResultOptions: {
+    keyResultId: string;
+    title: string;
+    objectiveTitle: string;
+  }[];
+  onLinkBlockKeyResult: (keyResultId: string | null) => void;
 }
 
 const DAY_LABELS = ["", "一", "二", "三", "四", "五", "六", "日"];
@@ -62,6 +68,8 @@ export function SidePanel({
   onAddManualTimer,
   onClearTimer,
   onClose,
+  keyResultOptions,
+  onLinkBlockKeyResult,
 }: SidePanelProps) {
   return (
     <aside
@@ -106,6 +114,10 @@ export function SidePanel({
         description={block?.description ?? ""}
         blockType={block?.blockType ?? BlockType.General}
         onSave={onSaveBlock}
+        blockId={block?.id ?? null}
+        keyResultId={block?.keyResultId ?? null}
+        keyResultOptions={keyResultOptions}
+        onLinkKeyResult={onLinkBlockKeyResult}
       />
       {block && (
         <>
