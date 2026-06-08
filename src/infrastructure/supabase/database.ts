@@ -44,6 +44,7 @@ interface DbBlock {
   title: string | null;
   description: string | null;
   status: string;
+  key_result_id: string | null;
 }
 
 function dbBlockToEntity(db: DbBlock): Block {
@@ -56,6 +57,7 @@ function dbBlockToEntity(db: DbBlock): Block {
     title: db.title ?? "",
     description: db.description ?? "",
     status: db.status as BlockStatus,
+    keyResultId: db.key_result_id ?? null,
   });
 }
 
@@ -269,6 +271,7 @@ export async function insertBlockRow(block: Block): Promise<void> {
     title: block.title,
     description: block.description,
     status: block.status,
+    key_result_id: block.keyResultId,
   });
   if (error) throw new Error(error.message);
 }
@@ -284,6 +287,7 @@ export async function updateBlockRow(block: Block): Promise<void> {
       title: block.title,
       description: block.description,
       status: block.status,
+      key_result_id: block.keyResultId,
     })
     .eq("id", block.id);
   if (error) throw new Error(error.message);
@@ -802,6 +806,7 @@ interface DbWeeklyTask {
   position: number;
   is_active: boolean;
   created_at: string;
+  key_result_id: string | null;
 }
 
 function dbWeeklyTaskToEntity(db: DbWeeklyTask): WeeklyTask {
@@ -812,6 +817,7 @@ function dbWeeklyTaskToEntity(db: DbWeeklyTask): WeeklyTask {
     position: db.position,
     isActive: db.is_active,
     createdAt: new Date(db.created_at),
+    keyResultId: db.key_result_id ?? null,
   });
 }
 
@@ -1230,4 +1236,63 @@ export async function reorderKeyResultRows(orderedIds: string[]): Promise<void> 
       .eq("id", orderedIds[i]);
     if (error) throw new Error(error.message);
   }
+}
+
+// --- OKR: weekly-task linking ---
+
+export async function dbSetWeeklyTaskKeyResult(
+  weeklyTaskId: string,
+  keyResultId: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from("weekly_tasks")
+    .update({ key_result_id: keyResultId })
+    .eq("id", weeklyTaskId);
+  if (error) throw new Error(error.message);
+}
+
+// --- OKR: stats queries ---
+
+export async function countLinkedWeeklyTasks(
+  keyResultId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("weekly_tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("key_result_id", keyResultId);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+export async function countWeeklyTaskCompletionsForKeyResult(
+  keyResultId: string,
+  startKey: string,
+  endKey: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("weekly_task_completions")
+    .select("week_start, weekly_tasks!inner(key_result_id)", {
+      count: "exact",
+      head: true,
+    })
+    .eq("weekly_tasks.key_result_id", keyResultId)
+    .gte("week_start", startKey)
+    .lte("week_start", endKey);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+export async function fetchBlocksForKeyResultInRange(
+  keyResultId: string,
+  startKey: string,
+  endKey: string,
+): Promise<Block[]> {
+  const { data, error } = await supabase
+    .from("blocks")
+    .select("*, week_plans!inner(week_start)")
+    .eq("key_result_id", keyResultId)
+    .gte("week_plans.week_start", startKey)
+    .lte("week_plans.week_start", endKey);
+  if (error) throw new Error(error.message);
+  return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
 }
