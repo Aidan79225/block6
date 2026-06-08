@@ -13,7 +13,13 @@ import type { TimerSession } from "@/domain/entities/timer-session";
 import { createTimerSession } from "@/domain/entities/timer-session";
 import type { DiaryEntry } from "@/domain/entities/diary-entry";
 import type { WeekPlan } from "@/domain/entities/week-plan";
-import { parseDateKey } from "@/lib/date-helpers";
+import type { OkrCycle } from "@/domain/entities/okr-cycle";
+import { createOkrCycle } from "@/domain/entities/okr-cycle";
+import type { Objective } from "@/domain/entities/objective";
+import { createObjective } from "@/domain/entities/objective";
+import type { KeyResult } from "@/domain/entities/key-result";
+import { createKeyResult } from "@/domain/entities/key-result";
+import { parseDateKey, formatDateKey } from "@/lib/date-helpers";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
   [BlockType.Core]: 1,
@@ -983,4 +989,245 @@ export async function insertPlanChange(
     .single();
   if (error) throw new Error(error.message);
   return dbPlanChangeToEntity(data as DbPlanChange);
+}
+
+// --- OKR: cycles ---
+
+interface DbOkrCycle {
+  id: string;
+  user_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+}
+
+function dbOkrCycleToEntity(db: DbOkrCycle): OkrCycle {
+  return createOkrCycle({
+    id: db.id,
+    userId: db.user_id,
+    name: db.name,
+    startDate: parseDateKey(db.start_date),
+    endDate: parseDateKey(db.end_date),
+    createdAt: new Date(db.created_at),
+  });
+}
+
+export async function fetchOkrCyclesForUser(userId: string): Promise<OkrCycle[]> {
+  const { data, error } = await supabase
+    .from("okr_cycles")
+    .select("*")
+    .eq("user_id", userId)
+    .order("start_date", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data as DbOkrCycle[]).map(dbOkrCycleToEntity);
+}
+
+export async function fetchOkrCycleById(id: string): Promise<OkrCycle | null> {
+  const { data, error } = await supabase
+    .from("okr_cycles")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbOkrCycleToEntity(data as DbOkrCycle);
+}
+
+export async function insertOkrCycle(cycle: OkrCycle): Promise<void> {
+  const { error } = await supabase.from("okr_cycles").insert({
+    id: cycle.id,
+    user_id: cycle.userId,
+    name: cycle.name,
+    start_date: formatDateKey(cycle.startDate),
+    end_date: formatDateKey(cycle.endDate),
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateOkrCycleRow(cycle: OkrCycle): Promise<void> {
+  const { error } = await supabase
+    .from("okr_cycles")
+    .update({
+      name: cycle.name,
+      start_date: formatDateKey(cycle.startDate),
+      end_date: formatDateKey(cycle.endDate),
+    })
+    .eq("id", cycle.id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteOkrCycleRow(id: string): Promise<void> {
+  const { error } = await supabase.from("okr_cycles").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// --- OKR: objectives ---
+
+interface DbObjective {
+  id: string;
+  cycle_id: string;
+  title: string;
+  description: string;
+  position: number;
+  created_at: string;
+}
+
+function dbObjectiveToEntity(db: DbObjective): Objective {
+  return createObjective({
+    id: db.id,
+    cycleId: db.cycle_id,
+    title: db.title,
+    description: db.description ?? "",
+    position: db.position,
+    createdAt: new Date(db.created_at),
+  });
+}
+
+export async function fetchObjectivesByCycle(cycleId: string): Promise<Objective[]> {
+  const { data, error } = await supabase
+    .from("objectives")
+    .select("*")
+    .eq("cycle_id", cycleId)
+    .order("position", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as DbObjective[]).map(dbObjectiveToEntity);
+}
+
+export async function fetchObjectiveById(id: string): Promise<Objective | null> {
+  const { data, error } = await supabase
+    .from("objectives")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbObjectiveToEntity(data as DbObjective);
+}
+
+export async function insertObjective(objective: Objective): Promise<void> {
+  const { error } = await supabase.from("objectives").insert({
+    id: objective.id,
+    cycle_id: objective.cycleId,
+    title: objective.title,
+    description: objective.description,
+    position: objective.position,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateObjectiveRow(objective: Objective): Promise<void> {
+  const { error } = await supabase
+    .from("objectives")
+    .update({
+      title: objective.title,
+      description: objective.description,
+      position: objective.position,
+    })
+    .eq("id", objective.id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteObjectiveRow(id: string): Promise<void> {
+  const { error } = await supabase.from("objectives").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function reorderObjectiveRows(orderedIds: string[]): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("objectives")
+      .update({ position: i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
+}
+
+// --- OKR: key results ---
+
+interface DbKeyResult {
+  id: string;
+  objective_id: string;
+  title: string;
+  unit: string;
+  target_value: number;
+  current_value: number;
+  position: number;
+  created_at: string;
+}
+
+function dbKeyResultToEntity(db: DbKeyResult): KeyResult {
+  return createKeyResult({
+    id: db.id,
+    objectiveId: db.objective_id,
+    title: db.title,
+    unit: db.unit ?? "",
+    targetValue: Number(db.target_value),
+    currentValue: Number(db.current_value),
+    position: db.position,
+    createdAt: new Date(db.created_at),
+  });
+}
+
+export async function fetchKeyResultsByObjective(objectiveId: string): Promise<KeyResult[]> {
+  const { data, error } = await supabase
+    .from("key_results")
+    .select("*")
+    .eq("objective_id", objectiveId)
+    .order("position", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as DbKeyResult[]).map(dbKeyResultToEntity);
+}
+
+export async function fetchKeyResultById(id: string): Promise<KeyResult | null> {
+  const { data, error } = await supabase
+    .from("key_results")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbKeyResultToEntity(data as DbKeyResult);
+}
+
+export async function insertKeyResult(kr: KeyResult): Promise<void> {
+  const { error } = await supabase.from("key_results").insert({
+    id: kr.id,
+    objective_id: kr.objectiveId,
+    title: kr.title,
+    unit: kr.unit,
+    target_value: kr.targetValue,
+    current_value: kr.currentValue,
+    position: kr.position,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateKeyResultRow(kr: KeyResult): Promise<void> {
+  const { error } = await supabase
+    .from("key_results")
+    .update({
+      title: kr.title,
+      unit: kr.unit,
+      target_value: kr.targetValue,
+      current_value: kr.currentValue,
+      position: kr.position,
+    })
+    .eq("id", kr.id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteKeyResultRow(id: string): Promise<void> {
+  const { error } = await supabase.from("key_results").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function reorderKeyResultRows(orderedIds: string[]): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("key_results")
+      .update({ position: i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
 }
