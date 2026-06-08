@@ -26,6 +26,12 @@ interface Props {
   onToggle: (id: string) => void;
   onDisable: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
+  keyResultOptions: {
+    keyResultId: string;
+    title: string;
+    objectiveTitle: string;
+  }[];
+  onLinkKeyResult: (id: string, keyResultId: string | null) => void;
 }
 
 function SortableRow({
@@ -34,12 +40,20 @@ function SortableRow({
   onEdit,
   onToggle,
   onDisable,
+  keyResultOptions,
+  onLinkKeyResult,
 }: {
   task: WeeklyTask;
   checked: boolean;
   onEdit: (id: string, title: string) => void;
   onToggle: (id: string) => void;
   onDisable: (id: string) => void;
+  keyResultOptions: {
+    keyResultId: string;
+    title: string;
+    objectiveTitle: string;
+  }[];
+  onLinkKeyResult: (id: string, keyResultId: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: task.id });
@@ -134,6 +148,29 @@ function SortableRow({
           {task.title}
         </span>
       )}
+      {keyResultOptions.length > 0 && (
+        <select
+          value={task.keyResultId ?? ""}
+          onChange={(e) => onLinkKeyResult(task.id, e.target.value || null)}
+          aria-label="歸屬 KR"
+          style={{
+            maxWidth: "96px",
+            background: "var(--color-bg-secondary)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--color-text-secondary)",
+            fontSize: "11px",
+            padding: "2px",
+          }}
+        >
+          <option value="">—</option>
+          {keyResultOptions.map((opt) => (
+            <option key={opt.keyResultId} value={opt.keyResultId}>
+              {opt.title}
+            </option>
+          ))}
+        </select>
+      )}
       <button
         onClick={() => onDisable(task.id)}
         aria-label="disable"
@@ -159,6 +196,8 @@ export function WeeklyChecklistPanel({
   onToggle,
   onDisable,
   onReorder,
+  keyResultOptions,
+  onLinkKeyResult,
 }: Props) {
   const [newTitle, setNewTitle] = useState("");
   const sensors = useSensors(useSensor(PointerSensor));
@@ -198,6 +237,8 @@ export function WeeklyChecklistPanel({
               onEdit={onEdit}
               onToggle={onToggle}
               onDisable={onDisable}
+              keyResultOptions={keyResultOptions}
+              onLinkKeyResult={onLinkKeyResult}
             />
           ))}
         </SortableContext>

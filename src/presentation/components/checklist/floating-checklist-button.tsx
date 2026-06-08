@@ -12,6 +12,12 @@ interface Props {
   onToggle: (id: string) => void;
   onDisable: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
+  keyResultOptions: {
+    keyResultId: string;
+    title: string;
+    objectiveTitle: string;
+  }[];
+  onLinkKeyResult: (id: string, keyResultId: string | null) => void;
   rightOffset?: string;
 }
 

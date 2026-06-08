@@ -31,6 +31,8 @@ describe("WeeklyChecklistPanel", () => {
         onToggle={() => {}}
         onDisable={() => {}}
         onReorder={() => {}}
+        keyResultOptions={[]}
+        onLinkKeyResult={() => {}}
       />,
     );
     expect(screen.getByText("運動")).toBeInTheDocument();
@@ -47,6 +49,8 @@ describe("WeeklyChecklistPanel", () => {
         onToggle={() => {}}
         onDisable={() => {}}
         onReorder={() => {}}
+        keyResultOptions={[]}
+        onLinkKeyResult={() => {}}
       />,
     );
     expect(screen.getByRole("checkbox")).toBeChecked();
@@ -66,6 +70,8 @@ describe("WeeklyChecklistPanel", () => {
         }}
         onDisable={() => {}}
         onReorder={() => {}}
+        keyResultOptions={[]}
+        onLinkKeyResult={() => {}}
       />,
     );
     await user.click(screen.getByRole("checkbox"));
@@ -86,6 +92,8 @@ describe("WeeklyChecklistPanel", () => {
         onToggle={() => {}}
         onDisable={() => {}}
         onReorder={() => {}}
+        keyResultOptions={[]}
+        onLinkKeyResult={() => {}}
       />,
     );
     const input = screen.getByPlaceholderText(/新增任務/);
@@ -107,6 +115,8 @@ describe("WeeklyChecklistPanel", () => {
           disabled = id;
         }}
         onReorder={() => {}}
+        keyResultOptions={[]}
+        onLinkKeyResult={() => {}}
       />,
     );
     await user.click(screen.getByRole("button", { name: /disable/i }));

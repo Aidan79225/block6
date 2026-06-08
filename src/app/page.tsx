@@ -94,6 +94,7 @@ export default function DashboardPage() {
     keyResultOptions,
     loadKeyResultOptions,
     linkBlockToKeyResult,
+    linkWeeklyTaskToKeyResult,
   } = useAppState();
   const notify = useNotify();
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -470,6 +471,8 @@ export default function DashboardPage() {
                 onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
                 onDisable={disableWeeklyTask}
                 onReorder={reorderWeeklyTasks}
+                keyResultOptions={keyResultOptions}
+                onLinkKeyResult={linkWeeklyTaskToKeyResult}
               />
             )}
             <div
@@ -663,6 +666,8 @@ export default function DashboardPage() {
             onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
             onDisable={disableWeeklyTask}
             onReorder={reorderWeeklyTasks}
+            keyResultOptions={keyResultOptions}
+            onLinkKeyResult={linkWeeklyTaskToKeyResult}
             rightOffset={selection ? "336px" : "16px"}
           />
         </div>
