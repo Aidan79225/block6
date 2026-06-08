@@ -50,8 +50,10 @@ import {
   removeWeeklyTaskCompletion as dbRemoveWeeklyTaskCompletion,
   fetchPlanChangesForWeek,
   insertPlanChange,
+  dbSetWeeklyTaskKeyResult,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
+import type { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
@@ -113,6 +115,10 @@ interface AppState {
     weekKey: string,
     now: Date,
   ) => Array<{ title: string; totalSeconds: number }>;
+  keyResultOptions: KeyResultOption[];
+  loadKeyResultOptions: (weekStart: Date) => void;
+  linkBlockToKeyResult: (blockId: string, keyResultId: string | null) => void;
+  linkWeeklyTaskToKeyResult: (id: string, keyResultId: string | null) => void;
 }
 
 // --- localStorage helpers ---
@@ -315,6 +321,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [weeklyCompletions, setWeeklyCompletions] = useState<
     Record<string, Set<string>>
   >({});
+  const [keyResultOptions, setKeyResultOptions] = useState<KeyResultOption[]>(
+    [],
+  );
 
   const [planChanges, setPlanChanges] = useState<Record<string, PlanChange[]>>(
     {},
@@ -1045,6 +1054,57 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [weeklyCompletions, notify],
   );
 
+  const loadKeyResultOptions = useCallback(
+    (weekStart: Date) => {
+      if (!user) {
+        Promise.resolve().then(() => setKeyResultOptions([]));
+        return;
+      }
+      useCases.listKeyResultsForWeek
+        .execute(user.id, weekStart)
+        .then((opts) => setKeyResultOptions(opts))
+        .catch((err) => {
+          console.error(err);
+          setKeyResultOptions([]);
+        });
+    },
+    [user, useCases],
+  );
+
+  const linkBlockToKeyResult = useCallback(
+    (blockId: string, keyResultId: string | null) => {
+      setSupaBlocks((prev) => {
+        const out: Record<string, Block[]> = {};
+        for (const [wk, list] of Object.entries(prev)) {
+          out[wk] = list.map((b) =>
+            b.id === blockId ? createBlock({ ...b, keyResultId }) : b,
+          );
+        }
+        return out;
+      });
+      useCases.linkBlockToKeyResult
+        .execute(blockId, keyResultId)
+        .catch((err) => {
+          console.error(err);
+          notify.error("區塊歸屬 KR 失敗");
+        });
+    },
+    [useCases, notify],
+  );
+
+  const linkWeeklyTaskToKeyResult = useCallback(
+    (id: string, keyResultId: string | null) => {
+      setWeeklyTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, keyResultId } : t)),
+      );
+      dbSetWeeklyTaskKeyResult(id, keyResultId).catch((err) => {
+        console.error(err);
+        notify.error("週任務歸屬 KR 失敗");
+      });
+    },
+    [notify],
+  );
+
   const getTaskTimeRanking = useCallback(
     (weekKey: string, now: Date) => {
       const weekBlocks = blocksByWeek[weekKey] ?? [];
@@ -1224,6 +1284,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         toggleWeeklyTaskCompletion,
         loadWeeklyCompletions,
         getTaskTimeRanking,
+        keyResultOptions,
+        loadKeyResultOptions,
+        linkBlockToKeyResult,
+        linkWeeklyTaskToKeyResult,
       }}
     >
       {children}
