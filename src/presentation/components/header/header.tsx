@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ThemeToggle } from "./theme-toggle";
 import { WeekNavigator } from "./week-navigator";
 import type { Theme } from "@/presentation/hooks/use-theme";
@@ -55,6 +56,17 @@ export function Header({
       >
         The Block 6
       </button>
+      <Link
+        href="/okr"
+        style={{
+          color: "var(--color-text-secondary)",
+          fontSize: "13px",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+      >
+        OKR
+      </Link>
       <WeekNavigator
         weekStart={weekStart}
         onPreviousWeek={onPreviousWeek}
