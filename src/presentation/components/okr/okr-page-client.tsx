@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { OkrCycle } from "@/domain/entities/okr-cycle";
-import { Objective } from "@/domain/entities/objective";
-import { KeyResult } from "@/domain/entities/key-result";
+import { CycleOkrView } from "@/domain/entities/key-result-progress";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useUseCases } from "@/presentation/providers/dependency-provider";
 import { useNotify } from "@/presentation/providers/notification-provider";
@@ -18,10 +17,7 @@ export function OkrPageClient() {
 
   const [cycles, setCycles] = useState<OkrCycle[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [objectives, setObjectives] = useState<Objective[]>([]);
-  const [krsByObjective, setKrsByObjective] = useState<
-    Record<string, KeyResult[]>
-  >({});
+  const [view, setView] = useState<CycleOkrView | null>(null);
   const [newObjectiveTitle, setNewObjectiveTitle] = useState("");
 
   const loadCycles = useCallback(async () => {
@@ -31,17 +27,10 @@ export function OkrPageClient() {
     setSelectedId((prev) => prev ?? list[0]?.id ?? null);
   }, [user, useCases]);
 
-  const loadTree = useCallback(
+  const loadView = useCallback(
     async (cycleId: string) => {
-      const objs = await useCases.listObjectivesByCycle.execute(cycleId);
-      setObjectives(objs);
-      const entries = await Promise.all(
-        objs.map(async (o) => {
-          const krs = await useCases.listKeyResultsByObjective.execute(o.id);
-          return [o.id, krs] as const;
-        }),
-      );
-      setKrsByObjective(Object.fromEntries(entries));
+      const v = await useCases.getCycleOkrView.execute(cycleId);
+      setView(v);
     },
     [useCases],
   );
@@ -57,12 +46,12 @@ export function OkrPageClient() {
   useEffect(() => {
     if (selectedId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- async load resolves after await; state is set in the resolved promise, not synchronously
-      loadTree(selectedId).catch((e) => {
+      loadView(selectedId).catch((e) => {
         console.error(e);
         notify.error("載入目標失敗");
       });
     }
-  }, [selectedId, loadTree, notify]);
+  }, [selectedId, loadView, notify]);
 
   const handleCreateCycle = async (
     name: string,
@@ -84,10 +73,10 @@ export function OkrPageClient() {
     if (!selectedId || !newObjectiveTitle.trim()) return;
     await useCases.createObjective.execute(selectedId, newObjectiveTitle.trim());
     setNewObjectiveTitle("");
-    await loadTree(selectedId);
+    await loadView(selectedId);
   };
 
-  const refresh = () => selectedId && loadTree(selectedId);
+  const refresh = () => selectedId && loadView(selectedId);
 
   return (
     <div
@@ -136,18 +125,18 @@ export function OkrPageClient() {
         }
       />
 
-      {selectedId &&
-        objectives.map((obj) => (
+      {view &&
+        view.objectives.map(({ objective, keyResults }) => (
           <ObjectiveCard
-            key={obj.id}
-            objective={obj}
-            keyResults={krsByObjective[obj.id] ?? []}
+            key={objective.id}
+            objective={objective}
+            keyResults={keyResults}
             onDeleteObjective={async () => {
-              await useCases.deleteObjective.execute(obj.id);
+              await useCases.deleteObjective.execute(objective.id);
               await refresh();
             }}
             onAddKeyResult={async (data) => {
-              await useCases.createKeyResult.execute(obj.id, data);
+              await useCases.createKeyResult.execute(objective.id, data);
               await refresh();
             }}
             onSaveKeyResultValue={async (krId, value) => {
@@ -161,7 +150,7 @@ export function OkrPageClient() {
           />
         ))}
 
-      {selectedId && (
+      {view && (
         <div style={{ display: "flex", gap: "6px" }}>
           <input
             placeholder="新增目標標題"

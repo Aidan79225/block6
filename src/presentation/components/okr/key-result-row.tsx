@@ -1,17 +1,23 @@
 "use client";
 
 import { KeyResult, keyResultProgress } from "@/domain/entities/key-result";
+import { KeyResultProgress } from "@/domain/entities/key-result-progress";
 import { KeyResultValueEditor } from "./key-result-value-editor";
 
 interface Props {
   keyResult: KeyResult;
+  progress: KeyResultProgress;
   onSaveValue: (value: number) => void;
   onDelete: () => void;
 }
 
-export function KeyResultRow({ keyResult, onSaveValue, onDelete }: Props) {
-  const progress = keyResultProgress(keyResult);
-  const pct = Math.round(progress * 100);
+export function KeyResultRow({
+  keyResult,
+  progress,
+  onSaveValue,
+  onDelete,
+}: Props) {
+  const pct = Math.round(keyResultProgress(keyResult) * 100);
 
   return (
     <div
@@ -73,6 +79,14 @@ export function KeyResultRow({ keyResult, onSaveValue, onDelete }: Props) {
           onSave={onSaveValue}
         />{" "}
         ({pct}%)
+      </div>
+      <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+        🔗 週任務 {progress.linkedWeeklyTaskCount} 個・這季完成{" "}
+        {progress.weeklyTaskCompletionCount} 次
+      </div>
+      <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+        ⏱ block 排 {progress.linkedBlockCount}・已執行{" "}
+        {progress.completedBlockCount}
       </div>
     </div>
   );

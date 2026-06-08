@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { Objective } from "@/domain/entities/objective";
-import { KeyResult } from "@/domain/entities/key-result";
+import { KeyResultWithProgress } from "@/domain/entities/key-result-progress";
 import { KeyResultRow } from "./key-result-row";
 
 interface Props {
   objective: Objective;
-  keyResults: KeyResult[];
+  keyResults: KeyResultWithProgress[];
   onDeleteObjective: () => void;
   onAddKeyResult: (data: {
     title: string;
@@ -76,12 +76,13 @@ export function ObjectiveCard({
         </button>
       </div>
 
-      {keyResults.map((kr) => (
+      {keyResults.map(({ keyResult, progress }) => (
         <KeyResultRow
-          key={kr.id}
-          keyResult={kr}
-          onSaveValue={(v) => onSaveKeyResultValue(kr.id, v)}
-          onDelete={() => onDeleteKeyResult(kr.id)}
+          key={keyResult.id}
+          keyResult={keyResult}
+          progress={progress}
+          onSaveValue={(v) => onSaveKeyResultValue(keyResult.id, v)}
+          onDelete={() => onDeleteKeyResult(keyResult.id)}
         />
       ))}
 
