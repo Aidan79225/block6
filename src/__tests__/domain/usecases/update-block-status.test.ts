@@ -19,6 +19,7 @@ const existingBlock: Block = {
   title: "Work",
   description: "",
   status: BlockStatus.Planned,
+  keyResultId: null,
 };
 
 describe("UpdateBlockStatusUseCase", () => {

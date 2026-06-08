@@ -20,6 +20,7 @@ export interface Block {
   readonly title: string;
   readonly description: string;
   readonly status: BlockStatus;
+  readonly keyResultId: string | null;
 }
 
 export interface CreateBlockInput {
@@ -31,6 +32,7 @@ export interface CreateBlockInput {
   title: string;
   description: string;
   status: BlockStatus;
+  keyResultId?: string | null;
 }
 
 export function createBlock(input: CreateBlockInput): Block {
@@ -38,5 +40,5 @@ export function createBlock(input: CreateBlockInput): Block {
     throw new Error("dayOfWeek must be between 1 and 7");
   if (input.slot < 1 || input.slot > 6)
     throw new Error("slot must be between 1 and 6");
-  return { ...input };
+  return { ...input, keyResultId: input.keyResultId ?? null };
 }

@@ -19,6 +19,7 @@ describe("BlockCell", () => {
             title: "專案開發",
             description: "",
             status: BlockStatus.Planned,
+            keyResultId: null,
           }}
           dayOfWeek={1}
           slot={1}
@@ -70,6 +71,7 @@ describe("BlockCell", () => {
             title: "Done",
             description: "",
             status: BlockStatus.Completed,
+            keyResultId: null,
           }}
           dayOfWeek={1}
           slot={1}

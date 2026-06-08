@@ -52,4 +52,33 @@ describe("Block", () => {
       }),
     ).toThrow("slot must be between 1 and 6");
   });
+
+  it("defaults keyResultId to null", () => {
+    const block = createBlock({
+      id: "b-1",
+      weekPlanId: "wp-1",
+      dayOfWeek: 1,
+      slot: 1,
+      blockType: BlockType.Core,
+      title: "t",
+      description: "",
+      status: BlockStatus.Planned,
+    });
+    expect(block.keyResultId).toBeNull();
+  });
+
+  it("keeps an explicit keyResultId", () => {
+    const block = createBlock({
+      id: "b-1",
+      weekPlanId: "wp-1",
+      dayOfWeek: 1,
+      slot: 1,
+      blockType: BlockType.Core,
+      title: "t",
+      description: "",
+      status: BlockStatus.Planned,
+      keyResultId: "k-1",
+    });
+    expect(block.keyResultId).toBe("k-1");
+  });
 });
