@@ -29,6 +29,10 @@ import { DeleteKeyResultUseCase } from "@/domain/usecases/delete-key-result";
 import { ReorderKeyResultsUseCase } from "@/domain/usecases/reorder-key-results";
 import { ListObjectivesByCycleUseCase } from "@/domain/usecases/list-objectives-by-cycle";
 import { ListKeyResultsByObjectiveUseCase } from "@/domain/usecases/list-key-results-by-objective";
+import { OkrStatsRepository } from "@/domain/repositories/okr-stats-repository";
+import { GetCycleOkrViewUseCase } from "@/domain/usecases/get-cycle-okr-view";
+import { ListKeyResultsForWeekUseCase } from "@/domain/usecases/list-key-results-for-week";
+import { LinkBlockToKeyResultUseCase } from "@/domain/usecases/link-block-to-key-result";
 
 export interface UseCases {
   createWeekPlan: CreateWeekPlanUseCase;
@@ -52,6 +56,9 @@ export interface UseCases {
   deleteKeyResult: DeleteKeyResultUseCase;
   reorderKeyResults: ReorderKeyResultsUseCase;
   listKeyResultsByObjective: ListKeyResultsByObjectiveUseCase;
+  getCycleOkrView: GetCycleOkrViewUseCase;
+  listKeyResultsForWeek: ListKeyResultsForWeekUseCase;
+  linkBlockToKeyResult: LinkBlockToKeyResultUseCase;
 }
 
 interface Repositories {
@@ -62,6 +69,7 @@ interface Repositories {
   okrCycleRepo: OkrCycleRepository;
   objectiveRepo: ObjectiveRepository;
   keyResultRepo: KeyResultRepository;
+  okrStatsRepo: OkrStatsRepository;
 }
 
 const UseCaseContext = createContext<UseCases | null>(null);
@@ -107,6 +115,20 @@ export function DependencyProvider({
       ),
       listKeyResultsByObjective: new ListKeyResultsByObjectiveUseCase(
         repositories.keyResultRepo,
+      ),
+      getCycleOkrView: new GetCycleOkrViewUseCase(
+        repositories.okrCycleRepo,
+        repositories.objectiveRepo,
+        repositories.keyResultRepo,
+        repositories.okrStatsRepo,
+      ),
+      listKeyResultsForWeek: new ListKeyResultsForWeekUseCase(
+        repositories.okrCycleRepo,
+        repositories.objectiveRepo,
+        repositories.keyResultRepo,
+      ),
+      linkBlockToKeyResult: new LinkBlockToKeyResultUseCase(
+        repositories.blockRepo,
       ),
     }),
     [repositories],
