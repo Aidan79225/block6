@@ -6,6 +6,9 @@ import { SupabaseBlockRepository } from "@/infrastructure/supabase/repositories/
 import { SupabaseDiaryRepository } from "@/infrastructure/supabase/repositories/supabase-diary-repository";
 import { SupabaseWeekPlanRepository } from "@/infrastructure/supabase/repositories/supabase-week-plan-repository";
 import { SupabaseWeekReviewRepository } from "@/infrastructure/supabase/repositories/supabase-week-review-repository";
+import { SupabaseOkrCycleRepository } from "@/infrastructure/supabase/repositories/supabase-okr-cycle-repository";
+import { SupabaseObjectiveRepository } from "@/infrastructure/supabase/repositories/supabase-objective-repository";
+import { SupabaseKeyResultRepository } from "@/infrastructure/supabase/repositories/supabase-key-result-repository";
 
 export function ProductionDependencyProvider({
   children,
@@ -18,6 +21,9 @@ export function ProductionDependencyProvider({
       diaryRepo: new SupabaseDiaryRepository(),
       weekPlanRepo: new SupabaseWeekPlanRepository(),
       weekReviewRepo: new SupabaseWeekReviewRepository(),
+      okrCycleRepo: new SupabaseOkrCycleRepository(),
+      objectiveRepo: new SupabaseObjectiveRepository(),
+      keyResultRepo: new SupabaseKeyResultRepository(),
     }),
     [],
   );
