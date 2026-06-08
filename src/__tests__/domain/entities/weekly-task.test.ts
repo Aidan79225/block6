@@ -41,4 +41,29 @@ describe("WeeklyTask", () => {
       }),
     ).toThrow("position must be non-negative");
   });
+
+  it("defaults keyResultId to null", () => {
+    const task = createWeeklyTask({
+      id: "t-1",
+      userId: "u-1",
+      title: "運動",
+      position: 0,
+      isActive: true,
+      createdAt: new Date(),
+    });
+    expect(task.keyResultId).toBeNull();
+  });
+
+  it("keeps an explicit keyResultId", () => {
+    const task = createWeeklyTask({
+      id: "t-1",
+      userId: "u-1",
+      title: "運動",
+      position: 0,
+      isActive: true,
+      createdAt: new Date(),
+      keyResultId: "k-1",
+    });
+    expect(task.keyResultId).toBe("k-1");
+  });
 });

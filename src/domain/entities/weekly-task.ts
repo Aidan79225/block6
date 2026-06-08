@@ -5,6 +5,7 @@ export interface WeeklyTask {
   readonly position: number;
   readonly isActive: boolean;
   readonly createdAt: Date;
+  readonly keyResultId: string | null;
 }
 
 export interface CreateWeeklyTaskInput {
@@ -14,6 +15,7 @@ export interface CreateWeeklyTaskInput {
   position: number;
   isActive: boolean;
   createdAt: Date;
+  keyResultId?: string | null;
 }
 
 export function createWeeklyTask(input: CreateWeeklyTaskInput): WeeklyTask {
@@ -23,5 +25,5 @@ export function createWeeklyTask(input: CreateWeeklyTaskInput): WeeklyTask {
   if (input.position < 0) {
     throw new Error("position must be non-negative");
   }
-  return { ...input };
+  return { ...input, keyResultId: input.keyResultId ?? null };
 }

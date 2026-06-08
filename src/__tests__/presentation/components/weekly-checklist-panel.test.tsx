@@ -12,6 +12,7 @@ function makeTask(overrides: Partial<WeeklyTask> = {}): WeeklyTask {
     position: 0,
     isActive: true,
     createdAt: new Date(),
+    keyResultId: null,
     ...overrides,
   };
 }
