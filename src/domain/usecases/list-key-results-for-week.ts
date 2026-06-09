@@ -17,8 +17,15 @@ export class ListKeyResultsForWeekUseCase {
 
   async execute(userId: string, weekStart: Date): Promise<KeyResultOption[]> {
     const cycles = await this.cycleRepo.findForUser(userId);
-    const ts = weekStart.getTime();
-    const cycle = cycles.find((c) => c.startDate.getTime() <= ts && ts <= c.endDate.getTime());
+    // The week spans weekStart (Mon) .. weekStart + 6 days (Sun). A cycle covers
+    // the week if their date ranges overlap by any day, so weeks that only
+    // partially fall inside the cycle (e.g. a cycle starting mid-week) still match.
+    const weekStartTs = weekStart.getTime();
+    const weekEndTs = weekStartTs + 6 * 24 * 60 * 60 * 1000;
+    const cycle = cycles.find(
+      (c) =>
+        c.startDate.getTime() <= weekEndTs && weekStartTs <= c.endDate.getTime(),
+    );
     if (!cycle) return [];
 
     const objectives = await this.objectiveRepo.findByCycle(cycle.id);
