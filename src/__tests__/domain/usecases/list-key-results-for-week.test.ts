@@ -31,4 +31,23 @@ describe("ListKeyResultsForWeekUseCase", () => {
     const options = await new ListKeyResultsForWeekUseCase(cycleRepo, makeObjRepo(), makeKrRepo()).execute("u-1", new Date("2026-12-07"));
     expect(options).toEqual([]);
   });
+
+  it("matches a week that only partially overlaps the cycle (cycle starts mid-week)", async () => {
+    const cycleRepo = makeCycleRepo(); const objRepo = makeObjRepo(); const krRepo = makeKrRepo();
+    // Cycle starts Wed 2026-07-08; the week of Mon 2026-07-06..Sun 2026-07-12 overlaps it.
+    const midWeekCycle: OkrCycle = { ...cycle, startDate: new Date("2026-07-08"), endDate: new Date("2026-09-28") };
+    vi.mocked(cycleRepo.findForUser).mockResolvedValue([midWeekCycle]);
+    vi.mocked(objRepo.findByCycle).mockResolvedValue([objective]);
+    vi.mocked(krRepo.findByObjective).mockResolvedValue([kr]);
+    const options = await new ListKeyResultsForWeekUseCase(cycleRepo, objRepo, krRepo).execute("u-1", new Date("2026-07-06"));
+    expect(options).toEqual([{ keyResultId: "k-1", title: "讀書", objectiveTitle: "健康" }]);
+  });
+
+  it("returns empty when the week ends before the cycle starts", async () => {
+    const cycleRepo = makeCycleRepo();
+    vi.mocked(cycleRepo.findForUser).mockResolvedValue([cycle]); // starts 2026-07-06
+    // Week of Mon 2026-06-29..Sun 2026-07-05 ends the day before the cycle starts.
+    const options = await new ListKeyResultsForWeekUseCase(cycleRepo, makeObjRepo(), makeKrRepo()).execute("u-1", new Date("2026-06-29"));
+    expect(options).toEqual([]);
+  });
 });
