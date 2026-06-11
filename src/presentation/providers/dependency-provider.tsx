@@ -33,6 +33,20 @@ import { OkrStatsRepository } from "@/domain/repositories/okr-stats-repository";
 import { GetCycleOkrViewUseCase } from "@/domain/usecases/get-cycle-okr-view";
 import { ListKeyResultsForWeekUseCase } from "@/domain/usecases/list-key-results-for-week";
 import { LinkBlockToKeyResultUseCase } from "@/domain/usecases/link-block-to-key-result";
+import { ProjectRepository } from "@/domain/repositories/project-repository";
+import { ProjectStepRepository } from "@/domain/repositories/project-step-repository";
+import { CreateProjectUseCase } from "@/domain/usecases/create-project";
+import { UpdateProjectUseCase } from "@/domain/usecases/update-project";
+import { DeleteProjectUseCase } from "@/domain/usecases/delete-project";
+import { ListProjectsUseCase } from "@/domain/usecases/list-projects";
+import { ReorderProjectsUseCase } from "@/domain/usecases/reorder-projects";
+import { CreateProjectStepUseCase } from "@/domain/usecases/create-project-step";
+import { UpdateProjectStepUseCase } from "@/domain/usecases/update-project-step";
+import { DeleteProjectStepUseCase } from "@/domain/usecases/delete-project-step";
+import { ReorderProjectStepsUseCase } from "@/domain/usecases/reorder-project-steps";
+import { ListProjectStepsByProjectUseCase } from "@/domain/usecases/list-project-steps-by-project";
+import { ToggleProjectStepCompletedUseCase } from "@/domain/usecases/toggle-project-step-completed";
+import { ListAllKeyResultsForUserUseCase } from "@/domain/usecases/list-all-key-results-for-user";
 
 export interface UseCases {
   createWeekPlan: CreateWeekPlanUseCase;
@@ -59,6 +73,18 @@ export interface UseCases {
   getCycleOkrView: GetCycleOkrViewUseCase;
   listKeyResultsForWeek: ListKeyResultsForWeekUseCase;
   linkBlockToKeyResult: LinkBlockToKeyResultUseCase;
+  createProject: CreateProjectUseCase;
+  updateProject: UpdateProjectUseCase;
+  deleteProject: DeleteProjectUseCase;
+  listProjects: ListProjectsUseCase;
+  reorderProjects: ReorderProjectsUseCase;
+  createProjectStep: CreateProjectStepUseCase;
+  updateProjectStep: UpdateProjectStepUseCase;
+  deleteProjectStep: DeleteProjectStepUseCase;
+  reorderProjectSteps: ReorderProjectStepsUseCase;
+  listProjectStepsByProject: ListProjectStepsByProjectUseCase;
+  toggleProjectStepCompleted: ToggleProjectStepCompletedUseCase;
+  listAllKeyResultsForUser: ListAllKeyResultsForUserUseCase;
 }
 
 interface Repositories {
@@ -70,6 +96,8 @@ interface Repositories {
   objectiveRepo: ObjectiveRepository;
   keyResultRepo: KeyResultRepository;
   okrStatsRepo: OkrStatsRepository;
+  projectRepo: ProjectRepository;
+  projectStepRepo: ProjectStepRepository;
 }
 
 const UseCaseContext = createContext<UseCases | null>(null);
@@ -129,6 +157,22 @@ export function DependencyProvider({
       ),
       linkBlockToKeyResult: new LinkBlockToKeyResultUseCase(
         repositories.blockRepo,
+      ),
+      createProject: new CreateProjectUseCase(repositories.projectRepo),
+      updateProject: new UpdateProjectUseCase(repositories.projectRepo),
+      deleteProject: new DeleteProjectUseCase(repositories.projectRepo),
+      listProjects: new ListProjectsUseCase(repositories.projectRepo),
+      reorderProjects: new ReorderProjectsUseCase(repositories.projectRepo),
+      createProjectStep: new CreateProjectStepUseCase(repositories.projectStepRepo),
+      updateProjectStep: new UpdateProjectStepUseCase(repositories.projectStepRepo),
+      deleteProjectStep: new DeleteProjectStepUseCase(repositories.projectStepRepo),
+      reorderProjectSteps: new ReorderProjectStepsUseCase(repositories.projectStepRepo),
+      listProjectStepsByProject: new ListProjectStepsByProjectUseCase(repositories.projectStepRepo),
+      toggleProjectStepCompleted: new ToggleProjectStepCompletedUseCase(repositories.projectStepRepo),
+      listAllKeyResultsForUser: new ListAllKeyResultsForUserUseCase(
+        repositories.okrCycleRepo,
+        repositories.objectiveRepo,
+        repositories.keyResultRepo,
       ),
     }),
     [repositories],
