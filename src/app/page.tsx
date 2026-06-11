@@ -95,6 +95,9 @@ export default function DashboardPage() {
     loadKeyResultOptions,
     linkBlockToKeyResult,
     linkWeeklyTaskToKeyResult,
+    projectOptions,
+    loadProjectOptions,
+    linkBlockToProject,
   } = useAppState();
   const notify = useNotify();
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -239,6 +242,10 @@ export default function DashboardPage() {
   useEffect(() => {
     loadKeyResultOptions(weekStart);
   }, [weekStart, loadKeyResultOptions]);
+
+  useEffect(() => {
+    loadProjectOptions();
+  }, [loadProjectOptions]);
 
   // Force a re-render every second while a timer is running
   useEffect(() => {
@@ -599,6 +606,10 @@ export default function DashboardPage() {
             onLinkBlockKeyResult={(keyResultId) => {
               if (selectedBlock)
                 linkBlockToKeyResult(selectedBlock.id, keyResultId);
+            }}
+            projectOptions={projectOptions}
+            onLinkBlockProject={(projectId) => {
+              if (selectedBlock) linkBlockToProject(selectedBlock.id, projectId);
             }}
           />
         )}
