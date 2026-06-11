@@ -1017,6 +1017,165 @@ git commit -m "feat: add ProjectStep use cases (CRUD, list, toggle)"
 
 ---
 
+## Task 7B: ListAllKeyResultsForUser use case (for the project → KR picker)
+
+**Files:**
+- Create: `src/domain/usecases/list-all-key-results-for-user.ts`
+- Test: `src/__tests__/domain/usecases/list-all-key-results-for-user.test.ts`
+
+Reuses the existing `KeyResultOption` type (`{ keyResultId, title, objectiveTitle }`) exported from `src/domain/usecases/list-key-results-for-week.ts`. Flattens every KR across all of the user's cycles (no week filter). The OKR repositories (`OkrCycleRepository`, `ObjectiveRepository`, `KeyResultRepository`) already exist from the shipped OKR feature.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// src/__tests__/domain/usecases/list-all-key-results-for-user.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { ListAllKeyResultsForUserUseCase } from "@/domain/usecases/list-all-key-results-for-user";
+import { OkrCycleRepository } from "@/domain/repositories/okr-cycle-repository";
+import { ObjectiveRepository } from "@/domain/repositories/objective-repository";
+import { KeyResultRepository } from "@/domain/repositories/key-result-repository";
+import { OkrCycle } from "@/domain/entities/okr-cycle";
+import { Objective } from "@/domain/entities/objective";
+import { KeyResult } from "@/domain/entities/key-result";
+
+const cycle: OkrCycle = {
+  id: "c-1",
+  userId: "u-1",
+  name: "Q3",
+  startDate: new Date("2026-07-01"),
+  endDate: new Date("2026-09-30"),
+  createdAt: new Date(),
+};
+const objective: Objective = {
+  id: "o-1",
+  cycleId: "c-1",
+  title: "健康",
+  description: "",
+  position: 0,
+  createdAt: new Date(),
+};
+const kr: KeyResult = {
+  id: "k-1",
+  objectiveId: "o-1",
+  title: "讀書",
+  unit: "本",
+  targetValue: 10,
+  currentValue: 0,
+  position: 0,
+  createdAt: new Date(),
+};
+
+const makeCycleRepo = (): OkrCycleRepository => ({
+  findForUser: vi.fn(),
+  findById: vi.fn(),
+  add: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+});
+const makeObjRepo = (): ObjectiveRepository => ({
+  findByCycle: vi.fn(),
+  findById: vi.fn(),
+  add: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+  reorder: vi.fn(),
+});
+const makeKrRepo = (): KeyResultRepository => ({
+  findByObjective: vi.fn(),
+  findById: vi.fn(),
+  add: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+  reorder: vi.fn(),
+});
+
+describe("ListAllKeyResultsForUserUseCase", () => {
+  it("flattens KRs across all the user's cycles", async () => {
+    const cycleRepo = makeCycleRepo();
+    const objRepo = makeObjRepo();
+    const krRepo = makeKrRepo();
+    vi.mocked(cycleRepo.findForUser).mockResolvedValue([cycle]);
+    vi.mocked(objRepo.findByCycle).mockResolvedValue([objective]);
+    vi.mocked(krRepo.findByObjective).mockResolvedValue([kr]);
+    const options = await new ListAllKeyResultsForUserUseCase(
+      cycleRepo,
+      objRepo,
+      krRepo,
+    ).execute("u-1");
+    expect(options).toEqual([
+      { keyResultId: "k-1", title: "讀書", objectiveTitle: "健康" },
+    ]);
+  });
+
+  it("returns empty when the user has no cycles", async () => {
+    const cycleRepo = makeCycleRepo();
+    vi.mocked(cycleRepo.findForUser).mockResolvedValue([]);
+    const options = await new ListAllKeyResultsForUserUseCase(
+      cycleRepo,
+      makeObjRepo(),
+      makeKrRepo(),
+    ).execute("u-1");
+    expect(options).toEqual([]);
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `pnpm vitest run src/__tests__/domain/usecases/list-all-key-results-for-user.test.ts`
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```ts
+// src/domain/usecases/list-all-key-results-for-user.ts
+import { OkrCycleRepository } from "@/domain/repositories/okr-cycle-repository";
+import { ObjectiveRepository } from "@/domain/repositories/objective-repository";
+import { KeyResultRepository } from "@/domain/repositories/key-result-repository";
+import { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
+
+export class ListAllKeyResultsForUserUseCase {
+  constructor(
+    private readonly cycleRepo: OkrCycleRepository,
+    private readonly objectiveRepo: ObjectiveRepository,
+    private readonly keyResultRepo: KeyResultRepository,
+  ) {}
+
+  async execute(userId: string): Promise<KeyResultOption[]> {
+    const cycles = await this.cycleRepo.findForUser(userId);
+    const options: KeyResultOption[] = [];
+    for (const cycle of cycles) {
+      const objectives = await this.objectiveRepo.findByCycle(cycle.id);
+      for (const objective of objectives) {
+        const krs = await this.keyResultRepo.findByObjective(objective.id);
+        for (const kr of krs) {
+          options.push({
+            keyResultId: kr.id,
+            title: kr.title,
+            objectiveTitle: objective.title,
+          });
+        }
+      }
+    }
+    return options;
+  }
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `pnpm vitest run src/__tests__/domain/usecases/list-all-key-results-for-user.test.ts`
+Expected: PASS (2 tests).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/domain/usecases/list-all-key-results-for-user.ts src/__tests__/domain/usecases/list-all-key-results-for-user.test.ts
+git commit -m "feat: add ListAllKeyResultsForUser use case"
+```
+
+---
+
 ## Task 8: Migration — projects & project_steps tables
 
 **Files:**
@@ -1389,7 +1548,10 @@ import { DeleteProjectStepUseCase } from "@/domain/usecases/delete-project-step"
 import { ReorderProjectStepsUseCase } from "@/domain/usecases/reorder-project-steps";
 import { ListProjectStepsByProjectUseCase } from "@/domain/usecases/list-project-steps-by-project";
 import { ToggleProjectStepCompletedUseCase } from "@/domain/usecases/toggle-project-step-completed";
+import { ListAllKeyResultsForUserUseCase } from "@/domain/usecases/list-all-key-results-for-user";
 ```
+
+> `ListAllKeyResultsForUserUseCase` reuses the OKR repos (`okrCycleRepo`, `objectiveRepo`, `keyResultRepo`) already present on `Repositories` from the shipped OKR feature — no new repo entry needed for it.
 
 Add to the `UseCases` interface:
 
@@ -1405,6 +1567,7 @@ Add to the `UseCases` interface:
   reorderProjectSteps: ReorderProjectStepsUseCase;
   listProjectStepsByProject: ListProjectStepsByProjectUseCase;
   toggleProjectStepCompleted: ToggleProjectStepCompletedUseCase;
+  listAllKeyResultsForUser: ListAllKeyResultsForUserUseCase;
 ```
 
 Add to the `Repositories` interface:
@@ -1439,6 +1602,11 @@ Add to the `useMemo<UseCases>` object:
       ),
       toggleProjectStepCompleted: new ToggleProjectStepCompletedUseCase(
         repositories.projectStepRepo,
+      ),
+      listAllKeyResultsForUser: new ListAllKeyResultsForUserUseCase(
+        repositories.okrCycleRepo,
+        repositories.objectiveRepo,
+        repositories.keyResultRepo,
       ),
 ```
 
@@ -1599,9 +1767,11 @@ import { ProjectStepRow } from "./project-step-row";
 interface Props {
   project: Project;
   steps: ProjectStep[];
+  keyResultOptions: { keyResultId: string; title: string; objectiveTitle: string }[];
   onAddStep: (title: string) => void;
   onRenameStep: (stepId: string, title: string) => void;
   onDeleteStep: (stepId: string) => void;
+  onSetKeyResult: (keyResultId: string | null) => void;
   onArchiveToggle: () => void;
   onDeleteProject: () => void;
 }
@@ -1609,9 +1779,11 @@ interface Props {
 export function ProjectCard({
   project,
   steps,
+  keyResultOptions,
   onAddStep,
   onRenameStep,
   onDeleteStep,
+  onSetKeyResult,
   onArchiveToggle,
   onDeleteProject,
 }: Props) {
@@ -1661,6 +1833,31 @@ export function ProjectCard({
           </button>
         </div>
       </div>
+
+      {keyResultOptions.length > 0 && (
+        <select
+          value={project.keyResultId ?? ""}
+          onChange={(e) => onSetKeyResult(e.target.value || null)}
+          aria-label="歸屬 KR"
+          style={{
+            alignSelf: "flex-start",
+            background: "var(--color-bg-primary)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--color-text-secondary)",
+            fontSize: "12px",
+            padding: "2px 6px",
+            marginBottom: "4px",
+          }}
+        >
+          <option value="">— 不歸屬 KR —</option>
+          {keyResultOptions.map((opt) => (
+            <option key={opt.keyResultId} value={opt.keyResultId}>
+              {opt.objectiveTitle} / {opt.title}
+            </option>
+          ))}
+        </select>
+      )}
 
       {steps.map((step) => (
         <ProjectStepRow
@@ -1729,13 +1926,20 @@ export function ProjectsPageClient() {
   const [stepsByProject, setStepsByProject] = useState<
     Record<string, ProjectStep[]>
   >({});
+  const [krOptions, setKrOptions] = useState<
+    { keyResultId: string; title: string; objectiveTitle: string }[]
+  >([]);
   const [showArchived, setShowArchived] = useState(false);
   const [newTitle, setNewTitle] = useState("");
 
   const load = useCallback(async () => {
     if (!user) return;
-    const list = await useCases.listProjects.execute(user.id);
+    const [list, allKrs] = await Promise.all([
+      useCases.listProjects.execute(user.id),
+      useCases.listAllKeyResultsForUser.execute(user.id),
+    ]);
     setProjects(list);
+    setKrOptions(allKrs);
     const entries = await Promise.all(
       list.map(async (p) => {
         const steps = await useCases.listProjectStepsByProject.execute(p.id);
@@ -1859,6 +2063,15 @@ export function ProjectsPageClient() {
           key={project.id}
           project={project}
           steps={stepsByProject[project.id] ?? []}
+          keyResultOptions={krOptions}
+          onSetKeyResult={async (keyResultId) => {
+            await useCases.updateProject.execute(project.id, {
+              title: project.title,
+              keyResultId,
+              status: project.status,
+            });
+            await load();
+          }}
           onAddStep={async (title) => {
             await useCases.createProjectStep.execute(project.id, title);
             await load();
@@ -1936,6 +2149,7 @@ Then `pnpm dev` and manually verify:
 - Add steps → they list with `○` and the `n/total` counter updates.
 - Rename a step (click title), delete a step.
 - Archive a project → it dims and hides unless "顯示已歸檔" is checked; un-archive restores it.
+- If you have OKR cycles/KRs, the "歸屬 KR" dropdown lists them; pick one → reload → it persists on the project.
 - Delete a project → it disappears.
 - Reload → data persists (Supabase). Step completion has no toggle here (expected — that's Plan 2).
 
@@ -1971,4 +2185,4 @@ git commit -m "chore: GTD projects foundation green (tests + lint)"
 
 ## Done — Plan 1 outcome
 
-A user can create projects, set them active/archived, manage an ordered step checklist, and (in Plan 2) optionally link a KR. Data persists via Supabase, fully covered by entity/repo/use-case tests. **Block linking + the step-completion checklist in the block side panel are Plan 2** (`docs/superpowers/plans/2026-06-11-gtd-projects-block-integration.md`). The "歸屬 KR" selector on the project card is also deferred to Plan 2 (it needs the KR option list); for now `keyResultId` stays null via the create flow.
+A user can create projects, set them active/archived, manage an ordered step checklist, and link a project to a KR via the "歸屬 KR" dropdown (powered by `ListAllKeyResultsForUserUseCase`). Data persists via Supabase, fully covered by entity/repo/use-case tests. **Block linking + the step-completion checklist in the block side panel are Plan 2** (`docs/superpowers/plans/2026-06-11-gtd-projects-block-integration.md`). Drag-reorder UI for steps/projects remains a deferred follow-up (the `reorder*` use cases exist; items show in creation order).

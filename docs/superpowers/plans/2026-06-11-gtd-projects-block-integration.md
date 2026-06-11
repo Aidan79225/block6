@@ -17,7 +17,7 @@
 - Block linking persists through `BlockRepository.update → updateBlockRow` (no separate db setter), exactly like block→KR.
 - The step checklist lives in its own component that reads steps + toggles via app-state, so block-editor/side-panel/page only thread the project dropdown (like the KR dropdown).
 
-**Deferred (explicit, not silent):** the "歸屬 KR" selector ON the project card (spec §4) is NOT built here — it needs a "list all KRs for the user" use case. `Project.keyResultId` plumbing already exists (model + `UpdateProjectUseCase`); the picker UI is a small future follow-up. Everything else in the spec is delivered across Plans 1+2.
+**Deferred (explicit, not silent):** drag-reorder UI for steps/projects is NOT built (the `reorder*` use cases exist; items show in creation order). The "歸屬 KR" picker on the project card is built in Plan 1 (Task 7B). Everything else in the spec is delivered across Plans 1+2.
 
 ---
 
@@ -711,4 +711,4 @@ git commit -m "chore: GTD projects block integration green (tests + lint)"
 
 ## Done — Plan 2 outcome
 
-A block attaches to one Project; its steps render as checkboxes in the block side panel, where completion is toggled (the single source of truth). One block can complete multiple steps; a step advances across multiple blocks. The `/projects` page shows completion read-only. Deleting a project detaches its blocks. **Deferred follow-up:** a "歸屬 KR" picker on the project card (the `keyResultId` plumbing is already in place from Plan 1).
+A block attaches to one Project; its steps render as checkboxes in the block side panel, where completion is toggled (the single source of truth). One block can complete multiple steps; a step advances across multiple blocks. The `/projects` page shows completion read-only. Deleting a project detaches its blocks. **Deferred follow-up:** drag-reorder UI for steps/projects (the `reorder*` use cases are already in place from Plan 1).
