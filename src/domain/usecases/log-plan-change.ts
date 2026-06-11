@@ -15,9 +15,6 @@ export interface LogPlanChangeInput {
 
 export function logPlanChange(input: LogPlanChangeInput): PlanChange {
   const trimmed = input.reason.trim();
-  if (trimmed.length === 0) {
-    throw new Error("reason must not be empty");
-  }
   return {
     id: crypto.randomUUID(),
     userId: input.userId,

@@ -41,12 +41,8 @@ export function PlanChangeDialog({
 
   if (!open) return null;
 
-  const trimmed = reason.trim();
-  const canConfirm = trimmed.length > 0;
-
   const handleConfirm = () => {
-    if (!canConfirm) return;
-    onConfirm(trimmed);
+    onConfirm(reason.trim());
   };
 
   return (
@@ -105,7 +101,7 @@ export function PlanChangeDialog({
           ref={textareaRef}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Reason (required)"
+          placeholder="Reason (optional)"
           aria-label="Reason for change"
           rows={4}
           style={{
@@ -141,20 +137,15 @@ export function PlanChangeDialog({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!canConfirm}
             style={{
-              background: canConfirm
-                ? "var(--color-accent)"
-                : "var(--color-bg-tertiary)",
-              color: canConfirm
-                ? "var(--color-bg-primary)"
-                : "var(--color-text-secondary)",
+              background: "var(--color-accent)",
+              color: "var(--color-bg-primary)",
               border: "none",
               borderRadius: "var(--radius-md)",
               padding: "8px 16px",
               fontSize: "14px",
               fontWeight: 600,
-              cursor: canConfirm ? "pointer" : "not-allowed",
+              cursor: "pointer",
             }}
           >
             Confirm

@@ -30,9 +30,9 @@ describe("logPlanChange", () => {
     expect(change.reason).toBe("too busy");
   });
 
-  it("throws if reason is empty after trim", () => {
-    expect(() => logPlanChange({ ...baseInput, reason: "" })).toThrow();
-    expect(() => logPlanChange({ ...baseInput, reason: "   " })).toThrow();
+  it("accepts an empty reason (optional)", () => {
+    expect(logPlanChange({ ...baseInput, reason: "" }).reason).toBe("");
+    expect(logPlanChange({ ...baseInput, reason: "   " }).reason).toBe("");
   });
 
   it("accepts null userId for anonymous/local mode", () => {
