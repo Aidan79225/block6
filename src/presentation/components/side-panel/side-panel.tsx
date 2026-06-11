@@ -41,6 +41,8 @@ interface SidePanelProps {
     objectiveTitle: string;
   }[];
   onLinkBlockKeyResult: (keyResultId: string | null) => void;
+  projectOptions: { projectId: string; title: string }[];
+  onLinkBlockProject: (projectId: string | null) => void;
 }
 
 const DAY_LABELS = ["", "一", "二", "三", "四", "五", "六", "日"];
@@ -70,6 +72,8 @@ export function SidePanel({
   onClose,
   keyResultOptions,
   onLinkBlockKeyResult,
+  projectOptions,
+  onLinkBlockProject,
 }: SidePanelProps) {
   return (
     <aside
@@ -118,6 +122,9 @@ export function SidePanel({
         keyResultId={block?.keyResultId ?? null}
         keyResultOptions={keyResultOptions}
         onLinkKeyResult={onLinkBlockKeyResult}
+        projectId={block?.projectId ?? null}
+        projectOptions={projectOptions}
+        onLinkProject={onLinkBlockProject}
       />
       {block && (
         <>

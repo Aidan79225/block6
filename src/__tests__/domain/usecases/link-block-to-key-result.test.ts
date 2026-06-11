@@ -3,7 +3,7 @@ import { LinkBlockToKeyResultUseCase } from "@/domain/usecases/link-block-to-key
 import { BlockRepository } from "@/domain/repositories/block-repository";
 import { Block, BlockStatus, BlockType } from "@/domain/entities/block";
 
-const block: Block = { id: "b-1", weekPlanId: "wp-1", dayOfWeek: 1, slot: 1, blockType: BlockType.Core, title: "讀書", description: "", status: BlockStatus.Planned, keyResultId: null };
+const block: Block = { id: "b-1", weekPlanId: "wp-1", dayOfWeek: 1, slot: 1, blockType: BlockType.Core, title: "讀書", description: "", status: BlockStatus.Planned, keyResultId: null, projectId: null };
 
 const makeRepo = (): BlockRepository => ({ findByWeekPlan: vi.fn(), findById: vi.fn(), save: vi.fn(), update: vi.fn() });
 

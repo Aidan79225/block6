@@ -10,6 +10,8 @@ import { SupabaseOkrCycleRepository } from "@/infrastructure/supabase/repositori
 import { SupabaseObjectiveRepository } from "@/infrastructure/supabase/repositories/supabase-objective-repository";
 import { SupabaseKeyResultRepository } from "@/infrastructure/supabase/repositories/supabase-key-result-repository";
 import { SupabaseOkrStatsRepository } from "@/infrastructure/supabase/repositories/supabase-okr-stats-repository";
+import { SupabaseProjectRepository } from "@/infrastructure/supabase/repositories/supabase-project-repository";
+import { SupabaseProjectStepRepository } from "@/infrastructure/supabase/repositories/supabase-project-step-repository";
 
 export function ProductionDependencyProvider({
   children,
@@ -26,6 +28,8 @@ export function ProductionDependencyProvider({
       objectiveRepo: new SupabaseObjectiveRepository(),
       keyResultRepo: new SupabaseKeyResultRepository(),
       okrStatsRepo: new SupabaseOkrStatsRepository(),
+      projectRepo: new SupabaseProjectRepository(),
+      projectStepRepo: new SupabaseProjectStepRepository(),
     }),
     [],
   );

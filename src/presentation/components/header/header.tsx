@@ -67,6 +67,17 @@ export function Header({
       >
         OKR
       </Link>
+      <Link
+        href="/projects"
+        style={{
+          color: "var(--color-text-secondary)",
+          fontSize: "13px",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+      >
+        Projects
+      </Link>
       <WeekNavigator
         weekStart={weekStart}
         onPreviousWeek={onPreviousWeek}

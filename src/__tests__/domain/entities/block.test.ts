@@ -81,4 +81,33 @@ describe("Block", () => {
     });
     expect(block.keyResultId).toBe("k-1");
   });
+
+  it("defaults projectId to null", () => {
+    const block = createBlock({
+      id: "b-1",
+      weekPlanId: "wp-1",
+      dayOfWeek: 1,
+      slot: 1,
+      blockType: BlockType.Core,
+      title: "t",
+      description: "",
+      status: BlockStatus.Planned,
+    });
+    expect(block.projectId).toBeNull();
+  });
+
+  it("keeps an explicit projectId", () => {
+    const block = createBlock({
+      id: "b-1",
+      weekPlanId: "wp-1",
+      dayOfWeek: 1,
+      slot: 1,
+      blockType: BlockType.Core,
+      title: "t",
+      description: "",
+      status: BlockStatus.Planned,
+      projectId: "p-1",
+    });
+    expect(block.projectId).toBe("p-1");
+  });
 });

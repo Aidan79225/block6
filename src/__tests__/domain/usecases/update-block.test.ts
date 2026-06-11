@@ -50,6 +50,7 @@ describe("UpdateBlockUseCase", () => {
       description: "Old desc",
       status: BlockStatus.Planned,
       keyResultId: null,
+      projectId: null,
     };
     vi.mocked(repo.findByWeekPlan).mockResolvedValue([existing]);
     vi.mocked(repo.update).mockResolvedValue(undefined);

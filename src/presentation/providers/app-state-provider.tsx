@@ -54,6 +54,7 @@ import {
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
+import type { ProjectStep } from "@/domain/entities/project-step";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
@@ -119,6 +120,16 @@ interface AppState {
   loadKeyResultOptions: (weekStart: Date) => void;
   linkBlockToKeyResult: (blockId: string, keyResultId: string | null) => void;
   linkWeeklyTaskToKeyResult: (id: string, keyResultId: string | null) => void;
+  projectOptions: { projectId: string; title: string }[];
+  loadProjectOptions: () => void;
+  linkBlockToProject: (blockId: string, projectId: string | null) => void;
+  projectSteps: Record<string, ProjectStep[]>;
+  loadProjectSteps: (projectId: string) => void;
+  toggleProjectStepCompleted: (
+    projectId: string,
+    stepId: string,
+    completed: boolean,
+  ) => void;
 }
 
 // --- localStorage helpers ---
@@ -324,6 +335,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [keyResultOptions, setKeyResultOptions] = useState<KeyResultOption[]>(
     [],
   );
+  const [projectOptions, setProjectOptions] = useState<
+    { projectId: string; title: string }[]
+  >([]);
+  const [projectSteps, setProjectSteps] = useState<
+    Record<string, ProjectStep[]>
+  >({});
 
   const [planChanges, setPlanChanges] = useState<Record<string, PlanChange[]>>(
     {},
@@ -1105,6 +1122,78 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [notify],
   );
 
+  const loadProjectOptions = useCallback(() => {
+    if (!user) {
+      Promise.resolve().then(() => setProjectOptions([]));
+      return;
+    }
+    useCases.listProjects
+      .execute(user.id)
+      .then((projects) =>
+        setProjectOptions(
+          projects
+            .filter((p) => p.status === "active")
+            .map((p) => ({ projectId: p.id, title: p.title })),
+        ),
+      )
+      .catch((err) => {
+        console.error(err);
+        setProjectOptions([]);
+      });
+  }, [user, useCases]);
+
+  const linkBlockToProject = useCallback(
+    (blockId: string, projectId: string | null) => {
+      setSupaBlocks((prev) => {
+        const out: Record<string, Block[]> = {};
+        for (const [wk, list] of Object.entries(prev)) {
+          out[wk] = list.map((b) =>
+            b.id === blockId ? createBlock({ ...b, projectId }) : b,
+          );
+        }
+        return out;
+      });
+      useCases.linkBlockToProject.execute(blockId, projectId).catch((err) => {
+        console.error(err);
+        notify.error("區塊歸屬專案失敗");
+      });
+    },
+    [useCases, notify],
+  );
+
+  const loadProjectSteps = useCallback(
+    (projectId: string) => {
+      useCases.listProjectStepsByProject
+        .execute(projectId)
+        .then((steps) =>
+          setProjectSteps((prev) => ({ ...prev, [projectId]: steps })),
+        )
+        .catch((err) => {
+          console.error(err);
+          notify.error("載入專案步驟失敗");
+        });
+    },
+    [useCases, notify],
+  );
+
+  const toggleProjectStepCompleted = useCallback(
+    (projectId: string, stepId: string, completed: boolean) => {
+      setProjectSteps((prev) => ({
+        ...prev,
+        [projectId]: (prev[projectId] ?? []).map((s) =>
+          s.id === stepId ? { ...s, completed } : s,
+        ),
+      }));
+      useCases.toggleProjectStepCompleted
+        .execute(stepId, completed)
+        .catch((err) => {
+          console.error(err);
+          notify.error("步驟狀態更新失敗");
+        });
+    },
+    [useCases, notify],
+  );
+
   const getTaskTimeRanking = useCallback(
     (weekKey: string, now: Date) => {
       const weekBlocks = blocksByWeek[weekKey] ?? [];
@@ -1288,6 +1377,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         loadKeyResultOptions,
         linkBlockToKeyResult,
         linkWeeklyTaskToKeyResult,
+        projectOptions,
+        loadProjectOptions,
+        linkBlockToProject,
+        projectSteps,
+        loadProjectSteps,
+        toggleProjectStepCompleted,
       }}
     >
       {children}

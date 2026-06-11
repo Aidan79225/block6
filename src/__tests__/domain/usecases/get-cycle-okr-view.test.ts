@@ -12,7 +12,7 @@ import { Block, BlockStatus, BlockType } from "@/domain/entities/block";
 const cycle: OkrCycle = { id: "c-1", userId: "u-1", name: "2026 Q3", startDate: new Date("2026-07-01"), endDate: new Date("2026-09-30"), createdAt: new Date() };
 const objective: Objective = { id: "o-1", cycleId: "c-1", title: "健康", description: "", position: 0, createdAt: new Date() };
 const kr: KeyResult = { id: "k-1", objectiveId: "o-1", title: "讀書", unit: "本", targetValue: 10, currentValue: 5, position: 0, createdAt: new Date() };
-const block = (status: BlockStatus): Block => ({ id: crypto.randomUUID(), weekPlanId: "wp-1", dayOfWeek: 1, slot: 1, blockType: BlockType.Core, title: "讀書", description: "", status, keyResultId: "k-1" });
+const block = (status: BlockStatus): Block => ({ id: crypto.randomUUID(), weekPlanId: "wp-1", dayOfWeek: 1, slot: 1, blockType: BlockType.Core, title: "讀書", description: "", status, keyResultId: "k-1", projectId: null });
 
 const makeCycleRepo = (): OkrCycleRepository => ({ findForUser: vi.fn(), findById: vi.fn(), add: vi.fn(), update: vi.fn(), delete: vi.fn() });
 const makeObjRepo = (): ObjectiveRepository => ({ findByCycle: vi.fn(), findById: vi.fn(), add: vi.fn(), update: vi.fn(), delete: vi.fn(), reorder: vi.fn() });

@@ -19,6 +19,10 @@ import type { Objective } from "@/domain/entities/objective";
 import { createObjective } from "@/domain/entities/objective";
 import type { KeyResult } from "@/domain/entities/key-result";
 import { createKeyResult } from "@/domain/entities/key-result";
+import type { Project } from "@/domain/entities/project";
+import { createProject } from "@/domain/entities/project";
+import type { ProjectStep } from "@/domain/entities/project-step";
+import { createProjectStep } from "@/domain/entities/project-step";
 import { parseDateKey, formatDateKey } from "@/lib/date-helpers";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
@@ -45,6 +49,7 @@ interface DbBlock {
   description: string | null;
   status: string;
   key_result_id: string | null;
+  project_id: string | null;
 }
 
 function dbBlockToEntity(db: DbBlock): Block {
@@ -58,6 +63,7 @@ function dbBlockToEntity(db: DbBlock): Block {
     description: db.description ?? "",
     status: db.status as BlockStatus,
     keyResultId: db.key_result_id ?? null,
+    projectId: db.project_id ?? null,
   });
 }
 
@@ -272,6 +278,7 @@ export async function insertBlockRow(block: Block): Promise<void> {
     description: block.description,
     status: block.status,
     key_result_id: block.keyResultId,
+    project_id: block.projectId,
   });
   if (error) throw new Error(error.message);
 }
@@ -288,6 +295,7 @@ export async function updateBlockRow(block: Block): Promise<void> {
       description: block.description,
       status: block.status,
       key_result_id: block.keyResultId,
+      project_id: block.projectId,
     })
     .eq("id", block.id);
   if (error) throw new Error(error.message);
@@ -1295,4 +1303,176 @@ export async function fetchBlocksForKeyResultInRange(
     .lte("week_plans.week_start", endKey);
   if (error) throw new Error(error.message);
   return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
+}
+
+// --- Projects ---
+
+interface DbProject {
+  id: string;
+  user_id: string;
+  title: string;
+  key_result_id: string | null;
+  status: string;
+  position: number;
+  created_at: string;
+}
+
+function dbProjectToEntity(db: DbProject): Project {
+  return createProject({
+    id: db.id,
+    userId: db.user_id,
+    title: db.title,
+    keyResultId: db.key_result_id ?? null,
+    status: db.status === "archived" ? "archived" : "active",
+    position: db.position,
+    createdAt: new Date(db.created_at),
+  });
+}
+
+export async function fetchProjectsForUser(userId: string): Promise<Project[]> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("user_id", userId)
+    .order("position", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as DbProject[]).map(dbProjectToEntity);
+}
+
+export async function fetchProjectById(id: string): Promise<Project | null> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbProjectToEntity(data as DbProject);
+}
+
+export async function insertProject(project: Project): Promise<void> {
+  const { error } = await supabase.from("projects").insert({
+    id: project.id,
+    user_id: project.userId,
+    title: project.title,
+    key_result_id: project.keyResultId,
+    status: project.status,
+    position: project.position,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateProjectRow(project: Project): Promise<void> {
+  const { error } = await supabase
+    .from("projects")
+    .update({
+      title: project.title,
+      key_result_id: project.keyResultId,
+      status: project.status,
+      position: project.position,
+    })
+    .eq("id", project.id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteProjectRow(id: string): Promise<void> {
+  const { error } = await supabase.from("projects").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function reorderProjectRows(orderedIds: string[]): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("projects")
+      .update({ position: i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
+}
+
+// --- Project steps ---
+
+interface DbProjectStep {
+  id: string;
+  project_id: string;
+  title: string;
+  position: number;
+  completed: boolean;
+  created_at: string;
+}
+
+function dbProjectStepToEntity(db: DbProjectStep): ProjectStep {
+  return createProjectStep({
+    id: db.id,
+    projectId: db.project_id,
+    title: db.title,
+    position: db.position,
+    completed: db.completed,
+    createdAt: new Date(db.created_at),
+  });
+}
+
+export async function fetchStepsByProject(
+  projectId: string,
+): Promise<ProjectStep[]> {
+  const { data, error } = await supabase
+    .from("project_steps")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("position", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as DbProjectStep[]).map(dbProjectStepToEntity);
+}
+
+export async function fetchProjectStepById(
+  id: string,
+): Promise<ProjectStep | null> {
+  const { data, error } = await supabase
+    .from("project_steps")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return dbProjectStepToEntity(data as DbProjectStep);
+}
+
+export async function insertProjectStep(step: ProjectStep): Promise<void> {
+  const { error } = await supabase.from("project_steps").insert({
+    id: step.id,
+    project_id: step.projectId,
+    title: step.title,
+    position: step.position,
+    completed: step.completed,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function updateProjectStepRow(step: ProjectStep): Promise<void> {
+  const { error } = await supabase
+    .from("project_steps")
+    .update({
+      title: step.title,
+      position: step.position,
+      completed: step.completed,
+    })
+    .eq("id", step.id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteProjectStepRow(id: string): Promise<void> {
+  const { error } = await supabase.from("project_steps").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function reorderProjectStepRows(
+  orderedIds: string[],
+): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("project_steps")
+      .update({ position: i })
+      .eq("id", orderedIds[i]);
+    if (error) throw new Error(error.message);
+  }
 }

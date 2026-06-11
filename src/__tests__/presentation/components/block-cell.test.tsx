@@ -20,6 +20,7 @@ describe("BlockCell", () => {
             description: "",
             status: BlockStatus.Planned,
             keyResultId: null,
+            projectId: null,
           }}
           dayOfWeek={1}
           slot={1}
@@ -72,6 +73,7 @@ describe("BlockCell", () => {
             description: "",
             status: BlockStatus.Completed,
             keyResultId: null,
+            projectId: null,
           }}
           dayOfWeek={1}
           slot={1}
