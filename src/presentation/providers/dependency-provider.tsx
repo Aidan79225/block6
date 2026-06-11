@@ -47,6 +47,7 @@ import { ReorderProjectStepsUseCase } from "@/domain/usecases/reorder-project-st
 import { ListProjectStepsByProjectUseCase } from "@/domain/usecases/list-project-steps-by-project";
 import { ToggleProjectStepCompletedUseCase } from "@/domain/usecases/toggle-project-step-completed";
 import { ListAllKeyResultsForUserUseCase } from "@/domain/usecases/list-all-key-results-for-user";
+import { LinkBlockToProjectUseCase } from "@/domain/usecases/link-block-to-project";
 
 export interface UseCases {
   createWeekPlan: CreateWeekPlanUseCase;
@@ -85,6 +86,7 @@ export interface UseCases {
   listProjectStepsByProject: ListProjectStepsByProjectUseCase;
   toggleProjectStepCompleted: ToggleProjectStepCompletedUseCase;
   listAllKeyResultsForUser: ListAllKeyResultsForUserUseCase;
+  linkBlockToProject: LinkBlockToProjectUseCase;
 }
 
 interface Repositories {
@@ -174,6 +176,7 @@ export function DependencyProvider({
         repositories.objectiveRepo,
         repositories.keyResultRepo,
       ),
+      linkBlockToProject: new LinkBlockToProjectUseCase(repositories.blockRepo),
     }),
     [repositories],
   );
