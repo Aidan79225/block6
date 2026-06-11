@@ -49,6 +49,7 @@ interface DbBlock {
   description: string | null;
   status: string;
   key_result_id: string | null;
+  project_id: string | null;
 }
 
 function dbBlockToEntity(db: DbBlock): Block {
@@ -62,6 +63,7 @@ function dbBlockToEntity(db: DbBlock): Block {
     description: db.description ?? "",
     status: db.status as BlockStatus,
     keyResultId: db.key_result_id ?? null,
+    projectId: db.project_id ?? null,
   });
 }
 
@@ -276,6 +278,7 @@ export async function insertBlockRow(block: Block): Promise<void> {
     description: block.description,
     status: block.status,
     key_result_id: block.keyResultId,
+    project_id: block.projectId,
   });
   if (error) throw new Error(error.message);
 }
@@ -292,6 +295,7 @@ export async function updateBlockRow(block: Block): Promise<void> {
       description: block.description,
       status: block.status,
       key_result_id: block.keyResultId,
+      project_id: block.projectId,
     })
     .eq("id", block.id);
   if (error) throw new Error(error.message);
