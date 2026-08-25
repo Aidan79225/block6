@@ -4,6 +4,13 @@
 
 Web-based implementation of the "6區塊黃金比例時間分配法" (BLOCK6 Golden Ratio Time Allocation Method).
 
+## Product Core
+
+Before proposing or removing a feature, read `docs/product-core.md`. It defines
+what this app is for and the metric every feature is judged by (planning
+decisions vs hours managed). Designs that conflict with it get changed, not the
+doc.
+
 ## Tech Stack
 
 - **Language:** TypeScript (strict mode)
