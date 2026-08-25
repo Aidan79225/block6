@@ -10,6 +10,7 @@ interface BlockCellProps {
   slot: number;
   isSelected?: boolean;
   onClick: () => void;
+  onToggleComplete?: () => void;
 }
 
 const typeColorMap: Record<BlockType, string> = {
@@ -20,10 +21,17 @@ const typeColorMap: Record<BlockType, string> = {
 };
 
 const statusIcon: Record<BlockStatus, string> = {
-  [BlockStatus.Planned]: "",
-  [BlockStatus.InProgress]: "\u25B6",
-  [BlockStatus.Completed]: "\u2713",
-  [BlockStatus.Skipped]: "\u2013",
+  [BlockStatus.Planned]: "○",
+  [BlockStatus.InProgress]: "▶",
+  [BlockStatus.Completed]: "✓",
+  [BlockStatus.Skipped]: "–",
+};
+
+const statusToggleLabel: Record<BlockStatus, string> = {
+  [BlockStatus.Planned]: "標記完成",
+  [BlockStatus.InProgress]: "標記完成",
+  [BlockStatus.Completed]: "取消完成",
+  [BlockStatus.Skipped]: "標記完成",
 };
 
 const SELECTED_OUTLINE = "2px solid var(--color-accent)";
@@ -36,6 +44,7 @@ export function BlockCell({
   slot,
   isSelected,
   onClick,
+  onToggleComplete,
 }: BlockCellProps) {
   const droppableId = `slot-${dayOfWeek}-${slot}`;
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: droppableId });
@@ -57,11 +66,6 @@ export function BlockCell({
     : isSelected
       ? SELECTED_OUTLINE
       : "none";
-
-  const combinedRef = (node: HTMLButtonElement | null) => {
-    setDropRef(node);
-    setDragRef(node);
-  };
 
   if (!block) {
     return (
@@ -90,51 +94,85 @@ export function BlockCell({
   }
 
   const borderColor = typeColorMap[block.blockType];
-  const icon = statusIcon[block.status];
+  const isCompleted = block.status === BlockStatus.Completed;
 
+  // The status toggle is a real button, so it cannot live inside the cell
+  // button: the cell wraps both and carries the drop target and the transform.
   return (
-    <button
-      ref={combinedRef}
-      onClick={onClick}
-      {...listeners}
-      {...attributes}
+    <div
+      ref={setDropRef}
       style={{
-        background: "var(--color-bg-secondary)",
-        borderLeft: `3px solid ${borderColor}`,
-        borderTop: "1px solid var(--color-border)",
-        borderRight: "1px solid var(--color-border)",
-        borderBottom: "1px solid var(--color-border)",
-        borderRadius: "var(--radius-sm)",
-        color: "var(--color-text-primary)",
-        cursor: "pointer",
-        padding: "6px 8px",
-        minHeight: "60px",
+        position: "relative",
         display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        textAlign: "left",
-        fontSize: "12px",
+        minHeight: "60px",
         opacity: isDragging || block.status === BlockStatus.Skipped ? 0.4 : 1,
-        outline,
-        outlineOffset: outline === "none" ? "0" : OUTLINE_OFFSET,
         transform: transform
           ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
           : undefined,
-        touchAction: "none",
+        outline,
+        outlineOffset: outline === "none" ? "0" : OUTLINE_OFFSET,
+        borderRadius: "var(--radius-sm)",
       }}
     >
-      <span style={{ fontWeight: 500, fontSize: "11px" }}>{block.title}</span>
-      {icon && (
+      <button
+        ref={setDragRef}
+        onClick={onClick}
+        {...listeners}
+        {...attributes}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          background: "var(--color-bg-secondary)",
+          borderLeft: `3px solid ${borderColor}`,
+          borderTop: "1px solid var(--color-border)",
+          borderRight: "1px solid var(--color-border)",
+          borderBottom: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-sm)",
+          color: "var(--color-text-primary)",
+          cursor: "pointer",
+          padding: "6px 22px 6px 8px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-start",
+          textAlign: "left",
+          fontSize: "12px",
+          touchAction: "none",
+        }}
+      >
         <span
           style={{
-            alignSelf: "flex-end",
-            fontSize: "12px",
-            color: borderColor,
+            fontWeight: 500,
+            fontSize: "11px",
+            color: block.title
+              ? "var(--color-text-primary)"
+              : "var(--color-text-muted)",
+            textDecoration: isCompleted ? "line-through" : "none",
           }}
         >
-          {icon}
+          {block.title || "未命名"}
         </span>
-      )}
-    </button>
+      </button>
+      <button
+        onClick={onToggleComplete}
+        disabled={!onToggleComplete}
+        aria-label={statusToggleLabel[block.status]}
+        aria-pressed={isCompleted}
+        title={statusToggleLabel[block.status]}
+        style={{
+          position: "absolute",
+          right: "2px",
+          bottom: "2px",
+          background: "none",
+          border: "none",
+          padding: "2px 4px",
+          lineHeight: 1,
+          fontSize: "12px",
+          cursor: onToggleComplete ? "pointer" : "default",
+          color: isCompleted ? borderColor : "var(--color-text-muted)",
+        }}
+      >
+        {statusIcon[block.status]}
+      </button>
+    </div>
   );
 }

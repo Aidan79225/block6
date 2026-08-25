@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
 import type { Subtask } from "@/domain/entities/subtask";
@@ -35,6 +38,7 @@ interface SidePanelProps {
   onAddManualTimer: (startedAt: Date, endedAt: Date) => void;
   onClearTimer: () => void;
   onClose: () => void;
+  onDeleteBlock: () => void;
   keyResultOptions: {
     keyResultId: string;
     title: string;
@@ -46,6 +50,16 @@ interface SidePanelProps {
 }
 
 const DAY_LABELS = ["", "一", "二", "三", "四", "五", "六", "日"];
+
+const dangerButtonStyle = {
+  background: "none",
+  border: "1px solid var(--color-border)",
+  borderRadius: "var(--radius-sm)",
+  color: "var(--color-block-buffer)",
+  padding: "6px 12px",
+  fontSize: "13px",
+  cursor: "pointer",
+} as const;
 
 export function SidePanel({
   dayOfWeek,
@@ -70,11 +84,17 @@ export function SidePanel({
   onAddManualTimer,
   onClearTimer,
   onClose,
+  onDeleteBlock,
   keyResultOptions,
   onLinkBlockKeyResult,
   projectOptions,
   onLinkBlockProject,
 }: SidePanelProps) {
+  // Keyed by block id so switching blocks drops a pending confirmation
+  // instead of carrying it over to the next one.
+  const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
+  const confirmingDelete = block !== null && confirmTarget === block.id;
+
   return (
     <aside
       className="side-panel"
@@ -159,6 +179,66 @@ export function SidePanel({
               狀態
             </label>
             <StatusToggle status={block.status} onChange={onStatusChange} />
+          </div>
+          <div
+            style={{
+              borderTop: "1px solid var(--color-border)",
+              paddingTop: "12px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
+            {confirmingDelete ? (
+              <>
+                <span
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    fontSize: "13px",
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  刪除這個區塊？
+                </span>
+                <button
+                  onClick={() => setConfirmTarget(null)}
+                  style={{
+                    background: "none",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--color-text-secondary)",
+                    padding: "6px 12px",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    setConfirmTarget(null);
+                    onDeleteBlock();
+                  }}
+                  style={{
+                    ...dangerButtonStyle,
+                    background: "var(--color-block-buffer)",
+                    color: "var(--color-bg-primary)",
+                    fontWeight: 600,
+                  }}
+                >
+                  確認刪除
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirmTarget(block.id)}
+                style={dangerButtonStyle}
+              >
+                刪除區塊
+              </button>
+            )}
           </div>
         </>
       )}

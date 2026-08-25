@@ -51,14 +51,18 @@ import {
   fetchPlanChangesForWeek,
   insertPlanChange,
   dbSetWeeklyTaskKeyResult,
+  findMostRecentWeekWithBlocks,
+  insertBlocks,
+  deleteBlock as dbDeleteBlock,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
 import type { ProjectStep } from "@/domain/entities/project-step";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
+import { buildWeekTemplate } from "@/domain/usecases/build-week-template";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
-import { formatDateKey, parseDateKey } from "@/lib/date-helpers";
+import { parseDateKey } from "@/lib/date-helpers";
 
 interface AppState {
   getBlocksForWeek: (weekKey: string) => Block[];
@@ -71,7 +75,11 @@ interface AppState {
     blockType: BlockType,
   ) => Block;
   updateStatus: (blockId: string, status: BlockStatus) => void;
-  copyPreviousWeekPlan: (currentWeekKey: string) => Promise<number>;
+  copyRecentWeekPlan: (
+    currentWeekKey: string,
+  ) => Promise<{ copied: number; sourceWeekKey: string | null }>;
+  applyWeekTemplate: (weekKey: string) => Promise<number>;
+  deleteBlock: (blockId: string) => Promise<void>;
   planChanges: Record<string, PlanChange[]>;
   loadPlanChanges: (weekKey: string) => Promise<void>;
   addPlanChange: (input: Omit<LogPlanChangeInput, "userId">) => Promise<void>;
@@ -172,6 +180,14 @@ function migrateDiaryEntries(
   return result;
 }
 
+// `storage` only fires in *other* tabs, so same-tab writes have to notify
+// subscribers explicitly or the UI silently keeps rendering stale data.
+const storageListeners = new Set<() => void>();
+
+function notifyStorageListeners(): void {
+  for (const listener of storageListeners) listener();
+}
+
 function loadFromStorage(): PersistedData {
   if (typeof window === "undefined") return EMPTY_DATA;
   try {
@@ -197,6 +213,7 @@ function saveToStorage(data: PersistedData): void {
     localStorage.setItem(STORAGE_KEY, json);
     cachedRaw = json;
     cachedData = data;
+    notifyStorageListeners();
   } catch {
     // Storage full or unavailable
   }
@@ -207,6 +224,7 @@ function clearStorage(): void {
     localStorage.removeItem(STORAGE_KEY);
     cachedRaw = null;
     cachedData = EMPTY_DATA;
+    notifyStorageListeners();
   } catch {
     // Ignore
   }
@@ -274,11 +292,15 @@ async function migrateLocalToSupabase(
 // --- Read localStorage as external store (SSR-safe) ---
 
 function subscribeToStorage(callback: () => void): () => void {
+  storageListeners.add(callback);
   const handler = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) callback();
   };
   window.addEventListener("storage", handler);
-  return () => window.removeEventListener("storage", handler);
+  return () => {
+    storageListeners.delete(callback);
+    window.removeEventListener("storage", handler);
+  };
 }
 
 let cachedRaw: string | null = null;
@@ -302,6 +324,10 @@ function getServerSnapshot(): PersistedData {
 
 const AppStateContext = createContext<AppState | null>(null);
 
+// How far back to look for a week worth copying. Long enough to survive a
+// month-long break, short enough that the search stays cheap.
+const MAX_WEEKS_BACK_FOR_COPY = 8;
+
 const PLAN_CHANGES_STORAGE_KEY = (userIdOrAnon: string) =>
   `block6:planChanges:${userIdOrAnon}`;
 
@@ -319,6 +345,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   // Supabase-sourced state (only used when logged in)
   const [supaBlocks, setSupaBlocks] = useState<Record<string, Block[]>>({});
+  const supaBlocksRef = useRef(supaBlocks);
+  useEffect(() => {
+    supaBlocksRef.current = supaBlocks;
+  }, [supaBlocks]);
   const [supaDiary, setSupaDiary] = useState<Record<string, DiaryLines>>({});
   const supaDiaryRef = useRef(supaDiary);
   useEffect(() => {
@@ -629,18 +659,26 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, notify, useCases],
   );
 
-  const copyPreviousWeekPlan = useCallback(
-    async (currentWeekKey: string): Promise<number> => {
-      if (!user) return 0;
+  const copyRecentWeekPlan = useCallback(
+    async (
+      currentWeekKey: string,
+    ): Promise<{ copied: number; sourceWeekKey: string | null }> => {
+      if (!user) return { copied: 0, sourceWeekKey: null };
 
-      const currentDate = new Date(currentWeekKey);
-      const prev = new Date(currentDate);
-      prev.setDate(prev.getDate() - 7);
-      const previousWeekKey = formatDateKey(prev);
+      // Look past the immediately previous week: after a break, that one is
+      // usually empty and the last plan the user actually wrote is further back.
+      const sourceWeekKey = await findMostRecentWeekWithBlocks(
+        user.id,
+        currentWeekKey,
+        MAX_WEEKS_BACK_FOR_COPY,
+      );
+      if (!sourceWeekKey) return { copied: 0, sourceWeekKey: null };
 
       try {
-        const prevBlocks = await fetchBlocksForWeek(user.id, previousWeekKey);
-        if (prevBlocks.length === 0) return 0;
+        const prevBlocks = await fetchBlocksForWeek(user.id, sourceWeekKey);
+        if (prevBlocks.length === 0) {
+          return { copied: 0, sourceWeekKey: null };
+        }
 
         const prevSubtasks = await fetchSubtasksForBlocks(
           prevBlocks.map((b) => b.id),
@@ -691,13 +729,100 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           inserted++;
         }
 
-        return inserted;
+        return { copied: inserted, sourceWeekKey };
       } finally {
         loadedWeeks.current.delete(currentWeekKey);
         loadWeek(currentWeekKey);
       }
     },
     [user, loadWeek],
+  );
+
+  /**
+   * Fill every still-empty slot of a week with the default BLOCK6 rhythm.
+   * The blocks land untitled — the point is to remove the "pick a type for all
+   * 42 cells" step, not to guess what the user will do.
+   */
+  const applyWeekTemplate = useCallback(
+    async (weekKey: string): Promise<number> => {
+      if (user) {
+        // The DB is the source of truth for what is occupied; local state can
+        // lag behind a copy or a save that is still in flight.
+        const existing = await fetchBlocksForWeek(user.id, weekKey);
+        const slots = buildWeekTemplate(existing);
+        if (slots.length === 0) return 0;
+        try {
+          await insertBlocks(user.id, weekKey, slots);
+          return slots.length;
+        } finally {
+          loadedWeeks.current.delete(weekKey);
+          loadWeek(weekKey);
+        }
+      }
+
+      const current = loadFromStorage();
+      const existing = current.blocks.filter((b) => b.weekPlanId === weekKey);
+      const slots = buildWeekTemplate(existing);
+      if (slots.length === 0) return 0;
+      for (const slot of slots) {
+        current.blocks.push(
+          createBlock({
+            id: crypto.randomUUID(),
+            weekPlanId: weekKey,
+            dayOfWeek: slot.dayOfWeek,
+            slot: slot.slot,
+            blockType: slot.blockType,
+            title: "",
+            description: "",
+            status: BlockStatus.Planned,
+          }),
+        );
+      }
+      saveToStorage(current);
+      return slots.length;
+    },
+    [user, loadWeek],
+  );
+
+  const deleteBlock = useCallback(
+    async (blockId: string): Promise<void> => {
+      if (user) {
+        const previous = supaBlocksRef.current;
+        const weekKey = Object.keys(previous).find((wk) =>
+          previous[wk].some((b) => b.id === blockId),
+        );
+        setSupaBlocks((prev) => {
+          const out: Record<string, Block[]> = {};
+          for (const [wk, list] of Object.entries(prev)) {
+            out[wk] = list.filter((b) => b.id !== blockId);
+          }
+          return out;
+        });
+        setSubtasks((prev) => prev.filter((st) => st.blockId !== blockId));
+        setTimerSessions((prev) => prev.filter((ts) => ts.blockId !== blockId));
+        setActiveTimer((prev) => (prev?.blockId === blockId ? null : prev));
+        try {
+          await dbDeleteBlock(blockId);
+        } catch (err) {
+          console.error(err);
+          notify.error("區塊刪除失敗");
+          setSupaBlocks(previous);
+          // Subtasks and timer sessions went with the block optimistically;
+          // refetching the week is the only way to bring them back intact.
+          if (weekKey) {
+            loadedWeeks.current.delete(weekKey);
+            loadWeek(weekKey);
+          }
+          throw err;
+        }
+        return;
+      }
+
+      const current = loadFromStorage();
+      current.blocks = current.blocks.filter((b) => b.id !== blockId);
+      saveToStorage(current);
+    },
+    [user, notify, loadWeek],
   );
 
   const swapBlocks = useCallback(
@@ -1335,7 +1460,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         getBlocksForWeek,
         saveBlock,
         updateStatus,
-        copyPreviousWeekPlan,
+        copyRecentWeekPlan,
+        applyWeekTemplate,
+        deleteBlock,
         planChanges,
         loadPlanChanges,
         addPlanChange,

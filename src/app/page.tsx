@@ -14,7 +14,7 @@ import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
 import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useNotify } from "@/presentation/providers/notification-provider";
-import { CopyLastWeekBanner } from "@/presentation/components/dashboard/copy-last-week-banner";
+import { WeekStartBanner } from "@/presentation/components/dashboard/week-start-banner";
 import { IntroDialog } from "@/presentation/components/intro-dialog/intro-dialog";
 import { PlanChangeDialog } from "@/presentation/components/plan-change-dialog/plan-change-dialog";
 import type { PlanChangeAction } from "@/domain/entities/plan-change";
@@ -88,7 +88,9 @@ export default function DashboardPage() {
     reorderWeeklyTasks,
     toggleWeeklyTaskCompletion,
     loadWeeklyCompletions,
-    copyPreviousWeekPlan,
+    copyRecentWeekPlan,
+    applyWeekTemplate,
+    deleteBlock,
     addPlanChange,
     loadPlanChanges,
     keyResultOptions,
@@ -107,6 +109,7 @@ export default function DashboardPage() {
   >("day");
   const [, forceTick] = useState(0);
   const [isCopying, setIsCopying] = useState(false);
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false);
 
   const [introOpen, setIntroOpen] = useState(false);
 
@@ -292,21 +295,65 @@ export default function DashboardPage() {
   const completionPct =
     totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
 
-  const handleCopyLastWeek = async () => {
-    if (isCopying) return;
+  const handleCopyRecentWeek = async () => {
+    if (isCopying || isApplyingTemplate) return;
     setIsCopying(true);
     try {
-      const count = await copyPreviousWeekPlan(weekKey);
-      if (count === 0) {
-        notify.info("上週沒有可複製的內容");
+      const { copied, sourceWeekKey } = await copyRecentWeekPlan(weekKey);
+      if (copied === 0) {
+        notify.info("最近幾週都沒有可複製的內容，試試「套用預設節奏」");
       } else {
-        notify.info(`已複製 ${count} 個區塊`);
+        // sourceWeekKey is a YYYY-MM-DD key; show it as M/D.
+        const [, month, day] = (sourceWeekKey ?? "").split("-");
+        notify.info(
+          `已從 ${Number(month)}/${Number(day)} 那週複製 ${copied} 個區塊`,
+        );
       }
     } catch (err) {
       console.error(err);
       notify.error("複製失敗，請稍後再試");
     } finally {
       setIsCopying(false);
+    }
+  };
+
+  const handleApplyTemplate = async () => {
+    if (isCopying || isApplyingTemplate) return;
+    setIsApplyingTemplate(true);
+    try {
+      const count = await applyWeekTemplate(weekKey);
+      if (count === 0) {
+        notify.info("這週已經沒有空格了");
+      } else {
+        notify.info(`已填入 ${count} 個區塊，接著把標題補上就好`);
+      }
+    } catch (err) {
+      console.error(err);
+      notify.error("套用預設節奏失敗，請稍後再試");
+    } finally {
+      setIsApplyingTemplate(false);
+    }
+  };
+
+  const handleToggleComplete = (blockId: string) => {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block) return;
+    updateStatus(
+      blockId,
+      block.status === BlockStatus.Completed
+        ? BlockStatus.Planned
+        : BlockStatus.Completed,
+    );
+  };
+
+  const handleDeleteBlock = async () => {
+    if (!selectedBlock) return;
+    const blockId = selectedBlock.id;
+    setSelection(null);
+    try {
+      await deleteBlock(blockId);
+    } catch {
+      // The provider already surfaced the failure and rolled the block back.
     }
   };
 
@@ -336,7 +383,11 @@ export default function DashboardPage() {
     if (day == null || slot == null) return;
 
     const locked = isLockedDay(getCellDate(weekStart, day), new Date());
-    if (locked) {
+    const isAdd = selection.kind === "empty";
+
+    // Filling a slot that was empty is not a change of plan — only reworking a
+    // block that already existed is worth interrupting the user for.
+    if (locked && !isAdd) {
       setPendingChange({
         kind: "save",
         dayOfWeek: day,
@@ -344,14 +395,24 @@ export default function DashboardPage() {
         title,
         description,
         blockType,
-        action: selection.kind === "empty" ? "add" : "edit",
+        action: "edit",
       });
       return;
     }
 
     const saved = saveBlock(weekKey, day, slot, title, description, blockType);
-    if (selection.kind === "empty") {
+    if (isAdd) {
       setSelection({ kind: "block", blockId: saved.id });
+    }
+    if (locked && isAdd) {
+      void addPlanChange({
+        weekKey,
+        dayOfWeek: day,
+        slot,
+        blockTitleSnapshot: title,
+        action: "add",
+        reason: "",
+      });
     }
   };
 
@@ -427,11 +488,13 @@ export default function DashboardPage() {
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
-          {user && blocks.length < 42 && (
-            <CopyLastWeekBanner
+          {blocks.length < 42 && (
+            <WeekStartBanner
               emptyCellCount={42 - blocks.length}
               isCopying={isCopying}
-              onCopy={handleCopyLastWeek}
+              isApplyingTemplate={isApplyingTemplate}
+              onCopy={user ? handleCopyRecentWeek : undefined}
+              onApplyTemplate={handleApplyTemplate}
             />
           )}
           <div className="desktop-only">
@@ -442,6 +505,7 @@ export default function DashboardPage() {
               onBlockClick={handleBlockClick}
               onSwapBlocks={handleSwapBlocks}
               onMoveBlock={handleMoveBlock}
+              onToggleComplete={handleToggleComplete}
             />
           </div>
           <div className="mobile-only">
@@ -458,6 +522,7 @@ export default function DashboardPage() {
                 onNextDay={
                   mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
                 }
+                onToggleComplete={handleToggleComplete}
               />
             )}
             {mobileView === "overview" && (
@@ -602,6 +667,7 @@ export default function DashboardPage() {
               if (selectedBlock) clearTimer(selectedBlock.id);
             }}
             onClose={() => setSelection(null)}
+            onDeleteBlock={handleDeleteBlock}
             keyResultOptions={keyResultOptions}
             onLinkBlockKeyResult={(keyResultId) => {
               if (selectedBlock)

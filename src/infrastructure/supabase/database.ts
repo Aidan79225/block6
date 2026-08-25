@@ -165,6 +165,83 @@ export async function fetchBlocksForWeek(
   return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
 }
 
+/**
+ * The most recent week at or before `beforeWeekStart` that actually holds
+ * blocks, searched back at most `maxWeeksBack` weeks. Returns null when the
+ * user has no populated week in that range.
+ */
+export async function findMostRecentWeekWithBlocks(
+  userId: string,
+  beforeWeekStart: string,
+  maxWeeksBack: number,
+): Promise<string | null> {
+  const { data: plans, error } = await supabase
+    .from("week_plans")
+    .select("id, week_start")
+    .eq("user_id", userId)
+    .lt("week_start", beforeWeekStart)
+    .order("week_start", { ascending: false })
+    .limit(maxWeeksBack);
+
+  if (error) throw new Error(error.message);
+  if (!plans || plans.length === 0) return null;
+
+  // Compare as date keys so the cutoff is timezone-independent.
+  const earliest = parseDateKey(beforeWeekStart);
+  earliest.setDate(earliest.getDate() - maxWeeksBack * 7);
+  const earliestKey = formatDateKey(earliest);
+
+  for (const plan of plans as { id: string; week_start: string }[]) {
+    if (plan.week_start < earliestKey) break;
+    const { count, error: countErr } = await supabase
+      .from("blocks")
+      .select("id", { count: "exact", head: true })
+      .eq("week_plan_id", plan.id);
+    if (countErr) throw new Error(countErr.message);
+    if ((count ?? 0) > 0) return plan.week_start;
+  }
+  return null;
+}
+
+/**
+ * Insert several brand-new blocks in one round trip. Callers must only pass
+ * slots that are still free — the unique(week_plan_id, day_of_week, slot)
+ * constraint rejects the whole batch otherwise.
+ */
+export async function insertBlocks(
+  userId: string,
+  weekStart: string,
+  rows: readonly {
+    dayOfWeek: number;
+    slot: number;
+    blockType: BlockType;
+  }[],
+): Promise<Block[]> {
+  if (rows.length === 0) return [];
+  const weekPlanId = await getOrCreateWeekPlan(userId, weekStart);
+  const { data, error } = await supabase
+    .from("blocks")
+    .insert(
+      rows.map((r) => ({
+        week_plan_id: weekPlanId,
+        day_of_week: r.dayOfWeek,
+        slot: r.slot,
+        block_type_id: BLOCK_TYPE_MAP[r.blockType],
+        title: "",
+        description: "",
+      })),
+    )
+    .select("*");
+
+  if (error) throw new Error(error.message);
+  return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
+}
+
+export async function deleteBlock(id: string): Promise<void> {
+  const { error } = await supabase.from("blocks").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function upsertBlock(
   userId: string,
   weekStart: string,
@@ -1027,7 +1104,9 @@ function dbOkrCycleToEntity(db: DbOkrCycle): OkrCycle {
   });
 }
 
-export async function fetchOkrCyclesForUser(userId: string): Promise<OkrCycle[]> {
+export async function fetchOkrCyclesForUser(
+  userId: string,
+): Promise<OkrCycle[]> {
   const { data, error } = await supabase
     .from("okr_cycles")
     .select("*")
@@ -1098,7 +1177,9 @@ function dbObjectiveToEntity(db: DbObjective): Objective {
   });
 }
 
-export async function fetchObjectivesByCycle(cycleId: string): Promise<Objective[]> {
+export async function fetchObjectivesByCycle(
+  cycleId: string,
+): Promise<Objective[]> {
   const { data, error } = await supabase
     .from("objectives")
     .select("*")
@@ -1108,7 +1189,9 @@ export async function fetchObjectivesByCycle(cycleId: string): Promise<Objective
   return (data as DbObjective[]).map(dbObjectiveToEntity);
 }
 
-export async function fetchObjectiveById(id: string): Promise<Objective | null> {
+export async function fetchObjectiveById(
+  id: string,
+): Promise<Objective | null> {
   const { data, error } = await supabase
     .from("objectives")
     .select("*")
@@ -1147,7 +1230,9 @@ export async function deleteObjectiveRow(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export async function reorderObjectiveRows(orderedIds: string[]): Promise<void> {
+export async function reorderObjectiveRows(
+  orderedIds: string[],
+): Promise<void> {
   for (let i = 0; i < orderedIds.length; i++) {
     const { error } = await supabase
       .from("objectives")
@@ -1183,7 +1268,9 @@ function dbKeyResultToEntity(db: DbKeyResult): KeyResult {
   });
 }
 
-export async function fetchKeyResultsByObjective(objectiveId: string): Promise<KeyResult[]> {
+export async function fetchKeyResultsByObjective(
+  objectiveId: string,
+): Promise<KeyResult[]> {
   const { data, error } = await supabase
     .from("key_results")
     .select("*")
@@ -1193,7 +1280,9 @@ export async function fetchKeyResultsByObjective(objectiveId: string): Promise<K
   return (data as DbKeyResult[]).map(dbKeyResultToEntity);
 }
 
-export async function fetchKeyResultById(id: string): Promise<KeyResult | null> {
+export async function fetchKeyResultById(
+  id: string,
+): Promise<KeyResult | null> {
   const { data, error } = await supabase
     .from("key_results")
     .select("*")
@@ -1236,7 +1325,9 @@ export async function deleteKeyResultRow(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export async function reorderKeyResultRows(orderedIds: string[]): Promise<void> {
+export async function reorderKeyResultRows(
+  orderedIds: string[],
+): Promise<void> {
   for (let i = 0; i < orderedIds.length; i++) {
     const { error } = await supabase
       .from("key_results")

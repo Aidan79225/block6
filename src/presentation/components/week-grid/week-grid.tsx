@@ -22,6 +22,7 @@ interface WeekGridProps {
   onBlockClick: (dayOfWeek: number, slot: number) => void;
   onSwapBlocks: (idA: string, idB: string) => void;
   onMoveBlock: (id: string, dayOfWeek: number, slot: number) => void;
+  onToggleComplete?: (blockId: string) => void;
 }
 
 const DAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
@@ -52,6 +53,7 @@ export function WeekGrid({
   onBlockClick,
   onSwapBlocks,
   onMoveBlock,
+  onToggleComplete,
 }: WeekGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -138,6 +140,11 @@ export function WeekGrid({
                   selectedDayOfWeek === dayOfWeek && selectedSlot === slot
                 }
                 onClick={() => onBlockClick(dayOfWeek, slot)}
+                onToggleComplete={
+                  block && onToggleComplete
+                    ? () => onToggleComplete(block.id)
+                    : undefined
+                }
               />
             );
           }),
