@@ -23,6 +23,8 @@ import type { Project } from "@/domain/entities/project";
 import { createProject } from "@/domain/entities/project";
 import type { ProjectStep } from "@/domain/entities/project-step";
 import { createProjectStep } from "@/domain/entities/project-step";
+import type { RhythmSlot } from "@/domain/entities/rhythm-slot";
+import { createRhythmSlot } from "@/domain/entities/rhythm-slot";
 import { parseDateKey, formatDateKey } from "@/lib/date-helpers";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
@@ -50,6 +52,7 @@ interface DbBlock {
   status: string;
   key_result_id: string | null;
   project_id: string | null;
+  suppressed?: boolean | null;
 }
 
 function dbBlockToEntity(db: DbBlock): Block {
@@ -64,6 +67,7 @@ function dbBlockToEntity(db: DbBlock): Block {
     status: db.status as BlockStatus,
     keyResultId: db.key_result_id ?? null,
     projectId: db.project_id ?? null,
+    suppressed: db.suppressed ?? false,
   });
 }
 
@@ -235,6 +239,130 @@ export async function insertBlocks(
 
   if (error) throw new Error(error.message);
   return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
+}
+
+/**
+ * Create or update the block for one slot, including its status. Used to
+ * materialize a rhythm-projected cell the moment the user acts on it.
+ */
+export async function materializeBlock(
+  userId: string,
+  weekStart: string,
+  input: {
+    dayOfWeek: number;
+    slot: number;
+    blockType: BlockType;
+    title: string;
+    description: string;
+    status?: BlockStatus;
+    suppressed?: boolean;
+  },
+): Promise<Block> {
+  const weekPlanId = await getOrCreateWeekPlan(userId, weekStart);
+  const { data, error } = await supabase
+    .from("blocks")
+    .upsert(
+      {
+        week_plan_id: weekPlanId,
+        day_of_week: input.dayOfWeek,
+        slot: input.slot,
+        block_type_id: BLOCK_TYPE_MAP[input.blockType],
+        title: input.title,
+        description: input.description,
+        status: input.status ?? BlockStatus.Planned,
+        suppressed: input.suppressed ?? false,
+      },
+      { onConflict: "week_plan_id,day_of_week,slot" },
+    )
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return dbBlockToEntity(data as DbBlock);
+}
+
+export async function setBlockSuppressed(
+  id: string,
+  suppressed: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from("blocks")
+    .update({ suppressed })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// --- Rhythm slots ---
+
+interface DbRhythmSlot {
+  id: string;
+  user_id: string;
+  day_of_week: number;
+  slot: number;
+  block_type_id: number;
+  title: string | null;
+  description: string | null;
+}
+
+function dbRhythmSlotToEntity(db: DbRhythmSlot): RhythmSlot {
+  return createRhythmSlot({
+    id: db.id,
+    userId: db.user_id,
+    dayOfWeek: db.day_of_week,
+    slot: db.slot,
+    blockType: BLOCK_TYPE_REVERSE[db.block_type_id] ?? BlockType.Core,
+    title: db.title ?? "",
+    description: db.description ?? "",
+  });
+}
+
+export async function fetchRhythmSlots(userId: string): Promise<RhythmSlot[]> {
+  const { data, error } = await supabase
+    .from("rhythm_slots")
+    .select("*")
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  return (data as DbRhythmSlot[]).map((db) => dbRhythmSlotToEntity(db));
+}
+
+/**
+ * Replace the whole rhythm in one shot. The rhythm is a single small picture
+ * of a typical week, so it is written as a whole rather than patched.
+ */
+export async function replaceRhythmSlots(
+  userId: string,
+  slots: readonly {
+    dayOfWeek: number;
+    slot: number;
+    blockType: BlockType;
+    title: string;
+    description: string;
+  }[],
+): Promise<RhythmSlot[]> {
+  const { error: deleteError } = await supabase
+    .from("rhythm_slots")
+    .delete()
+    .eq("user_id", userId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  if (slots.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("rhythm_slots")
+    .insert(
+      slots.map((s) => ({
+        user_id: userId,
+        day_of_week: s.dayOfWeek,
+        slot: s.slot,
+        block_type_id: BLOCK_TYPE_MAP[s.blockType],
+        title: s.title,
+        description: s.description,
+      })),
+    )
+    .select("*");
+
+  if (error) throw new Error(error.message);
+  return (data as DbRhythmSlot[]).map((db) => dbRhythmSlotToEntity(db));
 }
 
 export async function deleteBlock(id: string): Promise<void> {

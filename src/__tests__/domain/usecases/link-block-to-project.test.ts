@@ -14,6 +14,7 @@ const block: Block = {
   status: BlockStatus.Planned,
   keyResultId: null,
   projectId: null,
+  suppressed: false,
 };
 
 const makeRepo = (): BlockRepository => ({

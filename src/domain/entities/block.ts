@@ -22,6 +22,11 @@ export interface Block {
   readonly status: BlockStatus;
   readonly keyResultId: string | null;
   readonly projectId: string | null;
+  /**
+   * A slot the user deliberately emptied for this week, overriding the
+   * recurring rhythm. Suppressed blocks are never shown as blocks.
+   */
+  readonly suppressed: boolean;
 }
 
 export interface CreateBlockInput {
@@ -35,6 +40,7 @@ export interface CreateBlockInput {
   status: BlockStatus;
   keyResultId?: string | null;
   projectId?: string | null;
+  suppressed?: boolean;
 }
 
 export function createBlock(input: CreateBlockInput): Block {
@@ -46,5 +52,6 @@ export function createBlock(input: CreateBlockInput): Block {
     ...input,
     keyResultId: input.keyResultId ?? null,
     projectId: input.projectId ?? null,
+    suppressed: input.suppressed ?? false,
   };
 }

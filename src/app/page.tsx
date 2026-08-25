@@ -15,6 +15,8 @@ import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { WeekStartBanner } from "@/presentation/components/dashboard/week-start-banner";
+import { RhythmBar } from "@/presentation/components/dashboard/rhythm-bar";
+import { isRhythmBlockId } from "@/domain/usecases/project-rhythm-onto-week";
 import { IntroDialog } from "@/presentation/components/intro-dialog/intro-dialog";
 import { PlanChangeDialog } from "@/presentation/components/plan-change-dialog/plan-change-dialog";
 import type { PlanChangeAction } from "@/domain/entities/plan-change";
@@ -90,6 +92,9 @@ export default function DashboardPage() {
     loadWeeklyCompletions,
     copyRecentWeekPlan,
     applyWeekTemplate,
+    rhythmSlots,
+    setRhythmFromWeek,
+    clearRhythm,
     deleteBlock,
     addPlanChange,
     loadPlanChanges,
@@ -110,6 +115,7 @@ export default function DashboardPage() {
   const [, forceTick] = useState(0);
   const [isCopying, setIsCopying] = useState(false);
   const [isApplyingTemplate, setIsApplyingTemplate] = useState(false);
+  const [isSavingRhythm, setIsSavingRhythm] = useState(false);
 
   const [introOpen, setIntroOpen] = useState(false);
 
@@ -335,6 +341,38 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSetRhythmFromWeek = async () => {
+    if (isSavingRhythm) return;
+    setIsSavingRhythm(true);
+    try {
+      const count = await setRhythmFromWeek(weekKey);
+      notify.info(
+        count === 0
+          ? "這週沒有可設為節奏的區塊"
+          : `已設為常駐節奏（${count} 格），之後每週自動帶入`,
+      );
+    } catch (err) {
+      console.error(err);
+      notify.error("設定常駐節奏失敗，請稍後再試");
+    } finally {
+      setIsSavingRhythm(false);
+    }
+  };
+
+  const handleClearRhythm = async () => {
+    if (isSavingRhythm) return;
+    setIsSavingRhythm(true);
+    try {
+      await clearRhythm();
+      notify.info("已清除常駐節奏");
+    } catch (err) {
+      console.error(err);
+      notify.error("清除常駐節奏失敗，請稍後再試");
+    } finally {
+      setIsSavingRhythm(false);
+    }
+  };
+
   const handleToggleComplete = (blockId: string) => {
     const block = blocks.find((b) => b.id === blockId);
     if (!block) return;
@@ -488,6 +526,13 @@ export default function DashboardPage() {
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
+          <RhythmBar
+            rhythmSlotCount={rhythmSlots.length}
+            weekBlockCount={blocks.length}
+            isBusy={isSavingRhythm}
+            onSetFromWeek={handleSetRhythmFromWeek}
+            onClear={handleClearRhythm}
+          />
           {blocks.length < 42 && (
             <WeekStartBanner
               emptyCellCount={42 - blocks.length}
@@ -506,6 +551,7 @@ export default function DashboardPage() {
               onSwapBlocks={handleSwapBlocks}
               onMoveBlock={handleMoveBlock}
               onToggleComplete={handleToggleComplete}
+              isRhythmBlock={isRhythmBlockId}
             />
           </div>
           <div className="mobile-only">
@@ -523,6 +569,7 @@ export default function DashboardPage() {
                   mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
                 }
                 onToggleComplete={handleToggleComplete}
+                isRhythmBlock={isRhythmBlockId}
               />
             )}
             {mobileView === "overview" && (
