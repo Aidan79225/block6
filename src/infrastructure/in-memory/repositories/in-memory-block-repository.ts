@@ -27,4 +27,8 @@ export class InMemoryBlockRepository implements BlockRepository {
     }
     this.byId.set(block.id, block);
   }
+
+  async saveAll(blocks: readonly Block[]): Promise<void> {
+    for (const block of blocks) this.byId.set(block.id, block);
+  }
 }

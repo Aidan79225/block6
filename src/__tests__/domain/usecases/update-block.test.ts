@@ -8,6 +8,7 @@ const makeRepo = (): BlockRepository => ({
   findById: vi.fn(),
   save: vi.fn(),
   update: vi.fn(),
+  saveAll: vi.fn(),
 });
 
 const baseInput = {
