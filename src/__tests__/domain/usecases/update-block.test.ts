@@ -53,6 +53,7 @@ describe("UpdateBlockUseCase", () => {
       keyResultId: null,
       projectId: null,
       suppressed: false,
+      regretted: false,
     };
     vi.mocked(repo.findByWeekPlan).mockResolvedValue([existing]);
     vi.mocked(repo.update).mockResolvedValue(undefined);
@@ -81,6 +82,7 @@ describe("UpdateBlockUseCase", () => {
       keyResultId: null,
       projectId: null,
       suppressed: true,
+      regretted: false,
     };
     vi.mocked(repo.findByWeekPlan).mockResolvedValue([suppressed]);
     vi.mocked(repo.update).mockResolvedValue(undefined);
