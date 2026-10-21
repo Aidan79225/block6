@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   SetRhythmUseCase,
+  regrettedRhythmSlots,
   rhythmSlotsFromWeek,
   rhythmStartAfter,
+  rhythmWithout,
 } from "@/domain/usecases/set-rhythm";
 import { ListRhythmHistoryUseCase } from "@/domain/usecases/list-rhythm-history";
 import type { RhythmRepository } from "@/domain/repositories/rhythm-repository";
@@ -14,7 +16,7 @@ const makeRepo = (): RhythmRepository => ({
   save: vi.fn(),
 });
 
-function block(slot: number, suppressed = false) {
+function block(slot: number, suppressed = false, regretted = false) {
   return createBlock({
     id: `b-${slot}`,
     weekPlanId: "2026-08-31",
@@ -25,6 +27,7 @@ function block(slot: number, suppressed = false) {
     description: "備註",
     status: BlockStatus.Completed,
     suppressed,
+    regretted,
   });
 }
 
@@ -58,6 +61,39 @@ describe("rhythmSlotsFromWeek", () => {
   it("leaves out slots deliberately emptied this week", () => {
     const slots = rhythmSlotsFromWeek([block(1), block(2, true)]);
     expect(slots.map((s) => s.slot)).toEqual([1]);
+  });
+
+  it("leaves out blocks marked as not worth it", () => {
+    const slots = rhythmSlotsFromWeek([block(1), block(2, false, true)]);
+    expect(slots.map((s) => s.slot)).toEqual([1]);
+  });
+});
+
+describe("rhythmWithout", () => {
+  it("drops the given slots and keeps the rest", () => {
+    const rhythm = rhythmSlotsFromWeek([block(1), block(2), block(3)]);
+    const kept = rhythmWithout(rhythm, [{ dayOfWeek: 2, slot: 2 }]);
+    expect(kept.map((s) => s.slot)).toEqual([1, 3]);
+  });
+});
+
+describe("regrettedRhythmSlots", () => {
+  const rhythm = rhythmSlotsFromWeek([block(1), block(2), block(3)]);
+
+  it("finds regretted blocks the rhythm would bring back", () => {
+    const week = [block(1), block(2, false, true)];
+    expect(regrettedRhythmSlots(week, rhythm)).toEqual([
+      { dayOfWeek: 2, slot: 2 },
+    ]);
+  });
+
+  it("ignores a regretted block the rhythm no longer puts there", () => {
+    const renamed = createBlock({ ...block(3, false, true), title: "別的事" });
+    expect(regrettedRhythmSlots([renamed], rhythm)).toEqual([]);
+  });
+
+  it("ignores regretted blocks in slots the rhythm leaves empty", () => {
+    expect(regrettedRhythmSlots([block(5, false, true)], rhythm)).toEqual([]);
   });
 });
 

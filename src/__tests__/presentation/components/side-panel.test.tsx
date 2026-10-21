@@ -112,6 +112,7 @@ describe("SidePanel block deletion", () => {
     keyResultId: null,
     projectId: null,
     suppressed: false,
+    regretted: false,
   };
 
   it("offers no delete control when the slot is still empty", () => {

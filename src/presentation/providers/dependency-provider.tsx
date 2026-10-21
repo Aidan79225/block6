@@ -8,6 +8,7 @@ import { WeekReviewRepository } from "@/domain/repositories/week-review-reposito
 import { CreateWeekPlanUseCase } from "@/domain/usecases/create-week-plan";
 import { UpdateBlockUseCase } from "@/domain/usecases/update-block";
 import { NameSlotsUseCase } from "@/domain/usecases/name-slots";
+import { SetBlockRegrettedUseCase } from "@/domain/usecases/set-block-regretted";
 import { UpdateBlockStatusUseCase } from "@/domain/usecases/update-block-status";
 import { WriteDiaryUseCase } from "@/domain/usecases/write-diary";
 import { CreateWeekReviewUseCase } from "@/domain/usecases/create-week-review";
@@ -57,6 +58,7 @@ export interface UseCases {
   createWeekPlan: CreateWeekPlanUseCase;
   updateBlock: UpdateBlockUseCase;
   nameSlots: NameSlotsUseCase;
+  setBlockRegretted: SetBlockRegrettedUseCase;
   updateBlockStatus: UpdateBlockStatusUseCase;
   writeDiary: WriteDiaryUseCase;
   createWeekReview: CreateWeekReviewUseCase;
@@ -124,6 +126,7 @@ export function DependencyProvider({
       createWeekPlan: new CreateWeekPlanUseCase(repositories.weekPlanRepo),
       updateBlock: new UpdateBlockUseCase(repositories.blockRepo),
       nameSlots: new NameSlotsUseCase(repositories.blockRepo),
+      setBlockRegretted: new SetBlockRegrettedUseCase(repositories.blockRepo),
       updateBlockStatus: new UpdateBlockStatusUseCase(repositories.blockRepo),
       writeDiary: new WriteDiaryUseCase(repositories.diaryRepo),
       createWeekReview: new CreateWeekReviewUseCase(

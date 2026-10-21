@@ -2,6 +2,7 @@ import type { Block } from "@/domain/entities/block";
 import { Rhythm, createRhythm } from "@/domain/entities/rhythm";
 import { RhythmSlot, createRhythmSlot } from "@/domain/entities/rhythm-slot";
 import { RhythmRepository } from "@/domain/repositories/rhythm-repository";
+import type { SlotPosition } from "@/domain/usecases/slot-range";
 import { formatDateKey, getMonday } from "@/lib/date-helpers";
 
 /**
@@ -15,10 +16,13 @@ export function rhythmStartAfter(today: Date): string {
   return formatDateKey(monday);
 }
 
-/** The rhythm a week describes: every slot it visibly holds. */
+/**
+ * The rhythm a week describes: every slot it visibly holds, except blocks
+ * marked in review as not worth it — those should not come back every week.
+ */
 export function rhythmSlotsFromWeek(blocks: readonly Block[]): RhythmSlot[] {
   return blocks
-    .filter((b) => !b.suppressed)
+    .filter((b) => !b.suppressed && !b.regretted)
     .map((b) =>
       createRhythmSlot({
         dayOfWeek: b.dayOfWeek,
@@ -28,6 +32,39 @@ export function rhythmSlotsFromWeek(blocks: readonly Block[]): RhythmSlot[] {
         description: b.description,
       }),
     );
+}
+
+/** The rhythm without the given slots. */
+export function rhythmWithout(
+  rhythm: readonly RhythmSlot[],
+  remove: readonly SlotPosition[],
+): RhythmSlot[] {
+  return rhythm.filter(
+    (r) =>
+      !remove.some((p) => p.dayOfWeek === r.dayOfWeek && p.slot === r.slot),
+  );
+}
+
+/**
+ * Slots of regretted blocks that the rhythm would bring back every week:
+ * the rhythm still puts the same title and type there.
+ */
+export function regrettedRhythmSlots(
+  blocks: readonly Block[],
+  rhythm: readonly RhythmSlot[],
+): SlotPosition[] {
+  return blocks
+    .filter((b) => b.regretted)
+    .filter((b) =>
+      rhythm.some(
+        (r) =>
+          r.dayOfWeek === b.dayOfWeek &&
+          r.slot === b.slot &&
+          r.title === b.title &&
+          r.blockType === b.blockType,
+      ),
+    )
+    .map((b) => ({ dayOfWeek: b.dayOfWeek, slot: b.slot }));
 }
 
 export interface SetRhythmInput {
