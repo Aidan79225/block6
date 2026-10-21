@@ -48,6 +48,9 @@ import { ListProjectStepsByProjectUseCase } from "@/domain/usecases/list-project
 import { ToggleProjectStepCompletedUseCase } from "@/domain/usecases/toggle-project-step-completed";
 import { ListAllKeyResultsForUserUseCase } from "@/domain/usecases/list-all-key-results-for-user";
 import { LinkBlockToProjectUseCase } from "@/domain/usecases/link-block-to-project";
+import { RhythmRepository } from "@/domain/repositories/rhythm-repository";
+import { SetRhythmUseCase } from "@/domain/usecases/set-rhythm";
+import { ListRhythmHistoryUseCase } from "@/domain/usecases/list-rhythm-history";
 
 export interface UseCases {
   createWeekPlan: CreateWeekPlanUseCase;
@@ -87,6 +90,8 @@ export interface UseCases {
   toggleProjectStepCompleted: ToggleProjectStepCompletedUseCase;
   listAllKeyResultsForUser: ListAllKeyResultsForUserUseCase;
   linkBlockToProject: LinkBlockToProjectUseCase;
+  setRhythm: SetRhythmUseCase;
+  listRhythmHistory: ListRhythmHistoryUseCase;
 }
 
 interface Repositories {
@@ -100,6 +105,7 @@ interface Repositories {
   okrStatsRepo: OkrStatsRepository;
   projectRepo: ProjectRepository;
   projectStepRepo: ProjectStepRepository;
+  rhythmRepo: RhythmRepository;
 }
 
 const UseCaseContext = createContext<UseCases | null>(null);
@@ -177,6 +183,8 @@ export function DependencyProvider({
         repositories.keyResultRepo,
       ),
       linkBlockToProject: new LinkBlockToProjectUseCase(repositories.blockRepo),
+      setRhythm: new SetRhythmUseCase(repositories.rhythmRepo),
+      listRhythmHistory: new ListRhythmHistoryUseCase(repositories.rhythmRepo),
     }),
     [repositories],
   );
