@@ -1,19 +1,12 @@
 "use client";
 import { BlockType } from "@/domain/entities/block";
+import { BLOCK_TYPE_COLOR } from "@/presentation/components/block-type-color";
 
-const typeOptions: { value: BlockType; label: string; color: string }[] = [
-  { value: BlockType.Core, label: "核心", color: "var(--color-block-core)" },
-  { value: BlockType.Rest, label: "休息", color: "var(--color-block-rest)" },
-  {
-    value: BlockType.Buffer,
-    label: "緩衝",
-    color: "var(--color-block-buffer)",
-  },
-  {
-    value: BlockType.General,
-    label: "一般",
-    color: "var(--color-block-general)",
-  },
+const typeOptions: { value: BlockType; label: string }[] = [
+  { value: BlockType.Core, label: "核心" },
+  { value: BlockType.Rest, label: "休息" },
+  { value: BlockType.Buffer, label: "緩衝" },
+  { value: BlockType.General, label: "一般" },
 ];
 
 interface BlockTypePickerProps {
@@ -34,10 +27,12 @@ export function BlockTypePicker({ value, onChange }: BlockTypePickerProps) {
             borderRadius: "var(--radius-sm)",
             border:
               value === opt.value
-                ? `2px solid ${opt.color}`
+                ? `2px solid ${BLOCK_TYPE_COLOR[opt.value]}`
                 : "1px solid var(--color-border)",
             background:
-              value === opt.value ? opt.color : "var(--color-bg-tertiary)",
+              value === opt.value
+                ? BLOCK_TYPE_COLOR[opt.value]
+                : "var(--color-bg-tertiary)",
             color:
               value === opt.value
                 ? "var(--color-bg-primary)"

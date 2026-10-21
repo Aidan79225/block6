@@ -1,5 +1,6 @@
 import type { Block } from "@/domain/entities/block";
-import { BlockType, BlockStatus } from "@/domain/entities/block";
+import { BlockStatus } from "@/domain/entities/block";
+import { BLOCK_TYPE_COLOR } from "@/presentation/components/block-type-color";
 
 interface WeekOverviewProps {
   blocks: Block[];
@@ -7,13 +8,6 @@ interface WeekOverviewProps {
 }
 const DAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
 const SLOTS = [1, 2, 3, 4, 5, 6];
-const typeColorMap: Record<BlockType, string> = {
-  [BlockType.Core]: "var(--color-block-core)",
-  [BlockType.Rest]: "var(--color-block-rest)",
-  [BlockType.Buffer]: "var(--color-block-buffer)",
-  [BlockType.General]: "var(--color-block-general)",
-};
-
 export function WeekOverview({ blocks, onDayClick }: WeekOverviewProps) {
   function findBlock(day: number, slot: number): Block | null {
     return blocks.find((b) => b.dayOfWeek === day && b.slot === slot) ?? null;
@@ -46,11 +40,11 @@ export function WeekOverview({ blocks, onDayClick }: WeekOverviewProps) {
             const block = findBlock(day, slot);
             const bgColor = block
               ? block.status === BlockStatus.Completed
-                ? typeColorMap[block.blockType]
+                ? BLOCK_TYPE_COLOR[block.blockType]
                 : "var(--color-bg-tertiary)"
               : "var(--color-bg-secondary)";
             const borderColor = block
-              ? typeColorMap[block.blockType]
+              ? BLOCK_TYPE_COLOR[block.blockType]
               : "var(--color-border)";
             return (
               <button
