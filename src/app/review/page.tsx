@@ -8,6 +8,7 @@ import { ReflectionEditor } from "@/presentation/components/review/reflection-ed
 import { TaskTimeRanking } from "@/presentation/components/review/task-time-ranking";
 import { DiaryWeekView } from "@/presentation/components/review/diary-week-view";
 import { PlanChangesLog } from "@/presentation/components/review/plan-changes-log";
+import { RegretPicker } from "@/presentation/components/review/regret-picker";
 import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
@@ -37,6 +38,9 @@ export default function ReviewPage() {
     diaryEntries,
     planChanges,
     loadPlanChanges,
+    setBlockRegretted,
+    regrettedRhythmSlotsForWeek,
+    removeSlotsFromRhythm,
   } = useAppState();
 
   const weekKey = formatDateKey(weekStart);
@@ -94,6 +98,18 @@ export default function ReviewPage() {
   }
 
   const weekChanges = planChanges[weekKey] ?? [];
+
+  const rhythmRegrets = regrettedRhythmSlotsForWeek(weekKey);
+
+  const handleRemoveFromRhythm = async () => {
+    try {
+      await removeSlotsFromRhythm(rhythmRegrets);
+      notify.info(`下週起常駐節奏少了 ${rhythmRegrets.length} 格`);
+    } catch (err) {
+      console.error(err);
+      notify.error("更新常駐節奏失敗，請稍後再試");
+    }
+  };
 
   const handleSaveReflection = (text: string) => {
     setReflection(text);
@@ -159,6 +175,14 @@ export default function ReviewPage() {
       <DiaryWeekView entries={weekDiaries} />
       <PlanChangesLog changes={weekChanges} />
       <ReflectionEditor reflection={reflection} onSave={handleSaveReflection} />
+      <RegretPicker
+        blocks={blocks}
+        onToggle={(blockId, regretted) =>
+          void setBlockRegretted(blockId, regretted)
+        }
+        rhythmSlotCount={rhythmRegrets.length}
+        onRemoveFromRhythm={handleRemoveFromRhythm}
+      />
     </div>
   );
 }
