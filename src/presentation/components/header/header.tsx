@@ -12,6 +12,8 @@ interface HeaderProps {
   onToggleTheme: () => void;
   onSignOut?: () => void;
   onTitleClick: () => void;
+  /** Opens the diary without picking a block first. */
+  onOpenDiary?: () => void;
 }
 
 export function Header({
@@ -23,6 +25,7 @@ export function Header({
   onToggleTheme,
   onSignOut,
   onTitleClick,
+  onOpenDiary,
 }: HeaderProps) {
   return (
     <header
@@ -121,6 +124,23 @@ export function Header({
           >
             登入
           </a>
+        )}
+        {onOpenDiary && (
+          <button
+            onClick={onOpenDiary}
+            style={{
+              background: "none",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-md)",
+              color: "var(--color-text-secondary)",
+              padding: "4px 8px",
+              cursor: "pointer",
+              fontSize: "12px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            日記
+          </button>
         )}
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
