@@ -17,6 +17,9 @@
   --color-status-planned: #21262d;
   --color-status-skipped: #484f58;
   --color-border: #30363d;
+  --color-direction-1: #bc8cff;
+  --color-direction-2: #39c5cf;
+  --color-direction-3: #f778ba;
   --color-panel-bg: #161b22;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -41,6 +44,9 @@
   --color-status-planned: #eaeef2;
   --color-status-skipped: #8b949e;
   --color-border: #d0d7de;
+  --color-direction-1: #8250df;
+  --color-direction-2: #1b7c83;
+  --color-direction-3: #bf3989;
   --color-panel-bg: #ffffff;
   --radius-sm: 6px;
   --radius-md: 8px;
