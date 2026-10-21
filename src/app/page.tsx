@@ -108,13 +108,6 @@ export default function DashboardPage() {
     deleteBlock,
     addPlanChange,
     loadPlanChanges,
-    keyResultOptions,
-    loadKeyResultOptions,
-    linkBlockToKeyResult,
-    linkWeeklyTaskToKeyResult,
-    projectOptions,
-    loadProjectOptions,
-    linkBlockToProject,
   } = useAppState();
   const notify = useNotify();
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -300,13 +293,7 @@ export default function DashboardPage() {
     loadPlanChanges(weekKey);
   }, [weekKey, loadPlanChanges]);
 
-  useEffect(() => {
-    loadKeyResultOptions(weekStart);
-  }, [weekStart, loadKeyResultOptions]);
 
-  useEffect(() => {
-    loadProjectOptions();
-  }, [loadProjectOptions]);
 
   // Force a re-render every second while a timer is running
   useEffect(() => {
@@ -699,8 +686,6 @@ export default function DashboardPage() {
                 onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
                 onDisable={disableWeeklyTask}
                 onReorder={reorderWeeklyTasks}
-                keyResultOptions={keyResultOptions}
-                onLinkKeyResult={linkWeeklyTaskToKeyResult}
               />
             )}
             <div
@@ -832,15 +817,6 @@ export default function DashboardPage() {
             }}
             onClose={() => setSelection(null)}
             onDeleteBlock={handleDeleteBlock}
-            keyResultOptions={keyResultOptions}
-            onLinkBlockKeyResult={(keyResultId) => {
-              if (selectedBlock)
-                linkBlockToKeyResult(selectedBlock.id, keyResultId);
-            }}
-            projectOptions={projectOptions}
-            onLinkBlockProject={(projectId) => {
-              if (selectedBlock) linkBlockToProject(selectedBlock.id, projectId);
-            }}
           />
         )}
       </div>
@@ -907,8 +883,6 @@ export default function DashboardPage() {
             onToggle={(id) => toggleWeeklyTaskCompletion(id, weekKey)}
             onDisable={disableWeeklyTask}
             onReorder={reorderWeeklyTasks}
-            keyResultOptions={keyResultOptions}
-            onLinkKeyResult={linkWeeklyTaskToKeyResult}
             rightOffset={selection ? "336px" : "16px"}
           />
         </div>
