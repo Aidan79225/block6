@@ -18,9 +18,17 @@ import { WeekStartBanner } from "@/presentation/components/dashboard/week-start-
 import { RhythmBar } from "@/presentation/components/dashboard/rhythm-bar";
 import { isRhythmBlockId } from "@/domain/usecases/project-rhythm-onto-week";
 import {
+  daySelection,
   reconcileSelection,
+  selectionAfterClick,
   type Selection,
 } from "@/presentation/components/dashboard/selection";
+import { RangeNamingPanel } from "@/presentation/components/side-panel/range-naming-panel";
+import type { SlotPosition } from "@/domain/usecases/slot-range";
+import {
+  rangeNeedsReason,
+  rangePlanChanges,
+} from "@/domain/usecases/range-plan-changes";
 import { IntroDialog } from "@/presentation/components/intro-dialog/intro-dialog";
 import { PlanChangeDialog } from "@/presentation/components/plan-change-dialog/plan-change-dialog";
 import type { PlanChangeAction } from "@/domain/entities/plan-change";
@@ -63,6 +71,8 @@ export default function DashboardPage() {
   const {
     getBlocksForWeek,
     saveBlock,
+    nameSlots,
+    taskTitleSuggestions,
     updateStatus,
     saveDiary,
     getDiary,
@@ -152,6 +162,12 @@ export default function DashboardPage() {
         dayOfWeek: number;
         slot: number;
         titleSnapshot: string;
+      }
+    | {
+        kind: "range";
+        slots: SlotPosition[];
+        title: string;
+        blockType: BlockType;
       };
 
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(
@@ -168,6 +184,9 @@ export default function DashboardPage() {
     }
     if (pendingChange.kind === "move") {
       return `Move: "${pendingChange.titleSnapshot}" → day ${pendingChange.dayOfWeek} slot ${pendingChange.slot}`;
+    }
+    if (pendingChange.kind === "range") {
+      return `Rename ${pendingChange.slots.length} slots: "${pendingChange.title}"`;
     }
     if (pendingChange.kind === "delete") {
       return `Delete: "${pendingChange.titleSnapshot}"`;
@@ -202,6 +221,16 @@ export default function DashboardPage() {
         action: pending.action,
         reason,
       });
+      return;
+    }
+
+    if (pending.kind === "range") {
+      await applyRangeNaming(
+        pending.slots,
+        pending.title,
+        pending.blockType,
+        reason,
+      );
       return;
     }
 
@@ -291,15 +320,14 @@ export default function DashboardPage() {
       ? (blocks.find((b) => b.id === selection.blockId) ?? null)
       : null;
 
-  const selectedDayOfWeek =
+  const selectedPosition =
     selection?.kind === "block"
-      ? (selectedBlock?.dayOfWeek ?? null)
-      : (selection?.dayOfWeek ?? null);
-
-  const selectedSlot =
-    selection?.kind === "block"
-      ? (selectedBlock?.slot ?? null)
-      : (selection?.slot ?? null);
+      ? selectedBlock
+      : selection?.kind === "empty"
+        ? selection
+        : null;
+  const selectedDayOfWeek = selectedPosition?.dayOfWeek ?? null;
+  const selectedSlot = selectedPosition?.slot ?? null;
 
   useEffect(() => {
     if (selectedDayOfWeek != null) {
@@ -433,15 +461,56 @@ export default function DashboardPage() {
     await removeBlock(block.id);
   };
 
-  const handleBlockClick = (dayOfWeek: number, slot: number) => {
-    const block = blocks.find(
-      (b) => b.dayOfWeek === dayOfWeek && b.slot === slot,
+  const handleBlockClick = (
+    dayOfWeek: number,
+    slot: number,
+    extend = false,
+  ) =>
+    setSelection(
+      selectionAfterClick(selection, blocks, { dayOfWeek, slot }, extend),
     );
-    if (block) {
-      setSelection({ kind: "block", blockId: block.id });
-    } else {
-      setSelection({ kind: "empty", dayOfWeek, slot });
+
+  /** How today's plan lock sees a range: which days are locked, what's filled. */
+  const rangeLockView = (slots: SlotPosition[]) => {
+    const now = new Date();
+    return {
+      slots,
+      isLocked: (dayOfWeek: number) =>
+        isLockedDay(getCellDate(weekStart, dayOfWeek), now),
+      isOccupied: (p: SlotPosition) =>
+        blocks.some((b) => b.dayOfWeek === p.dayOfWeek && b.slot === p.slot),
+    };
+  };
+
+  const applyRangeNaming = async (
+    slots: SlotPosition[],
+    title: string,
+    blockType: BlockType,
+    reason: string,
+  ) => {
+    // Read before naming: afterwards every slot in the range is occupied.
+    const changes = rangePlanChanges({ ...rangeLockView(slots), reason });
+    setSelection(null);
+    try {
+      await nameSlots(weekKey, slots, title, blockType);
+    } catch {
+      return; // The provider already surfaced the failure.
     }
+    notify.info(`已命名 ${slots.length} 格`);
+    for (const change of changes) {
+      void addPlanChange({ weekKey, ...change, blockTitleSnapshot: title });
+    }
+  };
+
+  const handleNameRange = async (title: string, blockType: BlockType) => {
+    if (selection?.kind !== "range") return;
+    const { slots } = selection;
+    // One reason covers the whole range.
+    if (rangeNeedsReason(rangeLockView(slots))) {
+      setPendingChange({ kind: "range", slots, title, blockType });
+      return;
+    }
+    await applyRangeNaming(slots, title, blockType, "");
   };
 
   const handleSaveBlock = (
@@ -449,7 +518,7 @@ export default function DashboardPage() {
     description: string,
     blockType: BlockType,
   ) => {
-    if (!selection) return;
+    if (!selection || selection.kind === "range") return;
     const day =
       selection.kind === "block"
         ? selectedBlock?.dayOfWeek
@@ -585,6 +654,8 @@ export default function DashboardPage() {
               blocks={blocks}
               selectedDayOfWeek={selectedDayOfWeek}
               selectedSlot={selectedSlot}
+              rangeSlots={selection?.kind === "range" ? selection.slots : []}
+              onSelectDay={(day) => setSelection(daySelection(day))}
               onBlockClick={handleBlockClick}
               onSwapBlocks={handleSwapBlocks}
               onMoveBlock={handleMoveBlock}
@@ -701,6 +772,14 @@ export default function DashboardPage() {
             </div>
           </div>
         </main>
+        {selection?.kind === "range" && (
+          <RangeNamingPanel
+            slotCount={selection.slots.length}
+            titleSuggestions={taskTitleSuggestions}
+            onApply={handleNameRange}
+            onClose={() => setSelection(null)}
+          />
+        )}
         {selection && selectedDayOfWeek != null && selectedSlot != null && (
           <SidePanel
             dayOfWeek={selectedDayOfWeek}
