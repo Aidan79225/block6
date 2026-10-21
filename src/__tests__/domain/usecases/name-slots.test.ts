@@ -18,7 +18,6 @@ function stored(
     title: "舊標題",
     description: "細項",
     status: BlockStatus.Completed,
-    keyResultId: "kr-1",
     ...overrides,
   });
 }
@@ -56,7 +55,6 @@ describe("NameSlotsUseCase", () => {
       blockType: BlockType.Core,
       status: BlockStatus.Completed,
       description: "細項",
-      keyResultId: "kr-1",
     });
     expect(await repo.findById("b-3")).toEqual(renamed);
   });

@@ -41,8 +41,6 @@ interface DbBlock {
   title: string | null;
   description: string | null;
   status: string;
-  key_result_id: string | null;
-  project_id: string | null;
   suppressed?: boolean | null;
   regretted?: boolean | null;
 }
@@ -57,8 +55,6 @@ function dbBlockToEntity(db: DbBlock): Block {
     title: db.title ?? "",
     description: db.description ?? "",
     status: db.status as BlockStatus,
-    keyResultId: db.key_result_id ?? null,
-    projectId: db.project_id ?? null,
     suppressed: db.suppressed ?? false,
     regretted: db.regretted ?? false,
   });
@@ -453,8 +449,6 @@ function blockToRow(block: Block) {
     title: block.title,
     description: block.description,
     status: block.status,
-    key_result_id: block.keyResultId,
-    project_id: block.projectId,
     suppressed: block.suppressed,
     regretted: block.regretted,
   };
@@ -993,7 +987,6 @@ interface DbWeeklyTask {
   position: number;
   is_active: boolean;
   created_at: string;
-  key_result_id: string | null;
 }
 
 function dbWeeklyTaskToEntity(db: DbWeeklyTask): WeeklyTask {
@@ -1004,7 +997,6 @@ function dbWeeklyTaskToEntity(db: DbWeeklyTask): WeeklyTask {
     position: db.position,
     isActive: db.is_active,
     createdAt: new Date(db.created_at),
-    keyResultId: db.key_result_id ?? null,
   });
 }
 
