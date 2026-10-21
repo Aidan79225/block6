@@ -8,6 +8,10 @@ interface Props {
   isBusy: boolean;
   onSetFromWeek: () => void;
   onClear: () => void;
+  /** Slots the last few weeks all held the same way, not yet in the rhythm. */
+  suggestionCount?: number;
+  onAcceptSuggestion?: () => void;
+  onDismissSuggestion?: () => void;
 }
 
 const buttonStyle = (disabled: boolean) => ({
@@ -28,6 +32,9 @@ export function RhythmBar({
   isBusy,
   onSetFromWeek,
   onClear,
+  suggestionCount = 0,
+  onAcceptSuggestion,
+  onDismissSuggestion,
 }: Props) {
   const [confirmingClear, setConfirmingClear] = useState(false);
   const hasRhythm = rhythmSlotCount > 0;
@@ -106,6 +113,34 @@ export function RhythmBar({
             </button>
           )}
         </>
+      )}
+      {suggestionCount > 0 && (
+        <div
+          role="status"
+          style={{
+            flexBasis: "100%",
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "8px",
+            fontSize: "12px",
+            color: "var(--color-text-primary)",
+          }}
+        >
+          <span style={{ flex: 1, minWidth: 0 }}>
+            最近 3 週有 {suggestionCount} 格每週都一樣 — 設成常駐節奏？
+          </span>
+          <button
+            onClick={onAcceptSuggestion}
+            disabled={isBusy}
+            style={buttonStyle(isBusy)}
+          >
+            加入節奏
+          </button>
+          <button onClick={onDismissSuggestion} style={buttonStyle(false)}>
+            不用
+          </button>
+        </div>
       )}
     </div>
   );
