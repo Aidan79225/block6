@@ -17,6 +17,10 @@ import { useNotify } from "@/presentation/providers/notification-provider";
 import { WeekStartBanner } from "@/presentation/components/dashboard/week-start-banner";
 import { RhythmBar } from "@/presentation/components/dashboard/rhythm-bar";
 import { isRhythmBlockId } from "@/domain/usecases/project-rhythm-onto-week";
+import {
+  reconcileSelection,
+  type Selection,
+} from "@/presentation/components/dashboard/selection";
 import { IntroDialog } from "@/presentation/components/intro-dialog/intro-dialog";
 import { PlanChangeDialog } from "@/presentation/components/plan-change-dialog/plan-change-dialog";
 import type { PlanChangeAction } from "@/domain/entities/plan-change";
@@ -26,10 +30,6 @@ import {
   formatDateKey,
   isSameLocalDay,
 } from "@/lib/date-helpers";
-
-type Selection =
-  | { kind: "block"; blockId: string }
-  | { kind: "empty"; dayOfWeek: number; slot: number };
 
 const INTRO_STORAGE_KEY = "block6:hasSeenIntro";
 
@@ -309,13 +309,9 @@ export default function DashboardPage() {
   }, [selectedDayOfWeek, weekStart, loadDiary]);
 
   useEffect(() => {
-    if (
-      selection?.kind === "block" &&
-      !blocks.find((b) => b.id === selection.blockId)
-    ) {
-      setSelection(null);
-    }
-  }, [selection, blocks]);
+    const next = reconcileSelection(selection, blocks, weekKey);
+    if (next !== selection) setSelection(next);
+  }, [selection, blocks, weekKey]);
 
   const completedCount = blocks.filter(
     (b) => b.status === BlockStatus.Completed,
