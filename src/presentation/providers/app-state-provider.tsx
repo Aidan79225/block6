@@ -62,6 +62,7 @@ import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import { buildWeekTemplate } from "@/domain/usecases/build-week-template";
 import { planBlockMove } from "@/domain/usecases/plan-block-move";
+import { mergeIntoRhythm } from "@/domain/usecases/suggest-rhythm";
 import { nameBlocks } from "@/domain/usecases/name-slots";
 import type { SlotPosition } from "@/domain/usecases/slot-range";
 import {
@@ -120,6 +121,8 @@ interface AppState {
   regrettedRhythmSlotsForWeek: (weekKey: string) => SlotPosition[];
   /** Drop slots from the rhythm, from next week on. */
   removeSlotsFromRhythm: (slots: readonly SlotPosition[]) => Promise<void>;
+  /** Write slots into the rhythm, from next week on. */
+  addSlotsToRhythm: (slots: readonly RhythmSlot[]) => Promise<void>;
   deleteBlock: (blockId: string) => Promise<void>;
   planChanges: Record<string, PlanChange[]>;
   loadPlanChanges: (weekKey: string) => Promise<void>;
@@ -1165,6 +1168,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [getBlocksForWeek, rhythmSlots],
   );
 
+  const addSlotsToRhythm = useCallback(
+    (slots: readonly RhythmSlot[]) =>
+      adoptRhythmSlots(mergeIntoRhythm(rhythmSlots, slots)),
+    [adoptRhythmSlots, rhythmSlots],
+  );
+
   const removeSlotsFromRhythm = useCallback(
     (slots: readonly SlotPosition[]) =>
       adoptRhythmSlots(rhythmWithout(rhythmSlots, slots)),
@@ -1888,6 +1897,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         setBlockRegretted,
         regrettedRhythmSlotsForWeek,
         removeSlotsFromRhythm,
+        addSlotsToRhythm,
         deleteBlock,
         planChanges,
         loadPlanChanges,
