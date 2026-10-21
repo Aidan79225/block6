@@ -8,12 +8,14 @@ const ACTION_LABEL: Record<PlanChange["action"], string> = {
   edit: "編輯",
   move: "移動",
   add: "新增",
+  delete: "刪除",
 };
 
 const ACTION_COLOR: Record<PlanChange["action"], string> = {
   edit: "var(--color-block-core)",
   move: "var(--color-block-rest)",
   add: "var(--color-block-general)",
+  delete: "var(--color-block-buffer)",
 };
 
 const DAY_LABEL = ["日", "一", "二", "三", "四", "五", "六", "日"];

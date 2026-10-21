@@ -53,6 +53,7 @@ import {
   dbSetWeeklyTaskKeyResult,
   findMostRecentWeekWithBlocks,
   insertBlocks,
+  deleteBlock as dbDeleteBlock,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
@@ -78,6 +79,7 @@ interface AppState {
     currentWeekKey: string,
   ) => Promise<{ copied: number; sourceWeekKey: string | null }>;
   applyWeekTemplate: (weekKey: string) => Promise<number>;
+  deleteBlock: (blockId: string) => Promise<void>;
   planChanges: Record<string, PlanChange[]>;
   loadPlanChanges: (weekKey: string) => Promise<void>;
   addPlanChange: (input: Omit<LogPlanChangeInput, "userId">) => Promise<void>;
@@ -326,6 +328,17 @@ const AppStateContext = createContext<AppState | null>(null);
 // month-long break, short enough that the search stays cheap.
 const MAX_WEEKS_BACK_FOR_COPY = 8;
 
+function locateBlock(
+  byWeek: Record<string, Block[]>,
+  blockId: string,
+): { weekKey: string; block: Block } | null {
+  for (const [weekKey, list] of Object.entries(byWeek)) {
+    const block = list.find((b) => b.id === blockId);
+    if (block) return { weekKey, block };
+  }
+  return null;
+}
+
 const PLAN_CHANGES_STORAGE_KEY = (userIdOrAnon: string) =>
   `block6:planChanges:${userIdOrAnon}`;
 
@@ -343,6 +356,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   // Supabase-sourced state (only used when logged in)
   const [supaBlocks, setSupaBlocks] = useState<Record<string, Block[]>>({});
+  const supaBlocksRef = useRef(supaBlocks);
+  useEffect(() => {
+    supaBlocksRef.current = supaBlocks;
+  }, [supaBlocks]);
   const [supaDiary, setSupaDiary] = useState<Record<string, DiaryLines>>({});
   const supaDiaryRef = useRef(supaDiary);
   useEffect(() => {
@@ -776,6 +793,45 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       return slots.length;
     },
     [user, loadWeek],
+  );
+
+  const deleteBlock = useCallback(
+    async (blockId: string): Promise<void> => {
+      if (user) {
+        const previous = supaBlocksRef.current;
+        const located = locateBlock(previous, blockId);
+        setSupaBlocks((prev) => {
+          const out: Record<string, Block[]> = {};
+          for (const [wk, list] of Object.entries(prev)) {
+            out[wk] = list.filter((b) => b.id !== blockId);
+          }
+          return out;
+        });
+        setSubtasks((prev) => prev.filter((st) => st.blockId !== blockId));
+        setTimerSessions((prev) => prev.filter((ts) => ts.blockId !== blockId));
+        setActiveTimer((prev) => (prev?.blockId === blockId ? null : prev));
+        try {
+          await dbDeleteBlock(blockId);
+        } catch (err) {
+          console.error(err);
+          notify.error("區塊刪除失敗");
+          setSupaBlocks(previous);
+          // Subtasks and timer sessions went with the block optimistically;
+          // refetching the week is the only way to bring them back intact.
+          if (located) {
+            loadedWeeks.current.delete(located.weekKey);
+            loadWeek(located.weekKey);
+          }
+          throw err;
+        }
+        return;
+      }
+
+      const current = loadFromStorage();
+      current.blocks = current.blocks.filter((b) => b.id !== blockId);
+      saveToStorage(current);
+    },
+    [user, notify, loadWeek],
   );
 
   const swapBlocks = useCallback(
@@ -1415,6 +1471,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         updateStatus,
         copyRecentWeekPlan,
         applyWeekTemplate,
+        deleteBlock,
         planChanges,
         loadPlanChanges,
         addPlanChange,
