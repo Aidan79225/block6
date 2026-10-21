@@ -24,6 +24,7 @@ import {
   SetDirectionsUseCase,
 } from "@/domain/usecases/set-directions";
 import { GetDirectionTrajectoryUseCase } from "@/domain/usecases/get-direction-trajectory";
+import { SuggestRhythmUseCase } from "@/domain/usecases/suggest-rhythm";
 import {
   GetWeekFocusUseCase,
   SetWeekFocusUseCase,
@@ -45,6 +46,7 @@ export interface UseCases {
   getDirectionTrajectory: GetDirectionTrajectoryUseCase;
   getWeekFocus: GetWeekFocusUseCase;
   setWeekFocus: SetWeekFocusUseCase;
+  suggestRhythm: SuggestRhythmUseCase;
 }
 
 interface Repositories {
@@ -90,6 +92,10 @@ export function DependencyProvider({
       ),
       getWeekFocus: new GetWeekFocusUseCase(repositories.weekFocusRepo),
       setWeekFocus: new SetWeekFocusUseCase(repositories.weekFocusRepo),
+      suggestRhythm: new SuggestRhythmUseCase(
+        repositories.weekHistoryRepo,
+        repositories.rhythmRepo,
+      ),
     }),
     [repositories],
   );
