@@ -50,8 +50,6 @@ describe("UpdateBlockUseCase", () => {
       title: "Old Title",
       description: "Old desc",
       status: BlockStatus.Planned,
-      keyResultId: null,
-      projectId: null,
       suppressed: false,
       regretted: false,
     };
@@ -79,8 +77,6 @@ describe("UpdateBlockUseCase", () => {
       title: "健身",
       description: "",
       status: BlockStatus.Planned,
-      keyResultId: null,
-      projectId: null,
       suppressed: true,
       regretted: false,
     };

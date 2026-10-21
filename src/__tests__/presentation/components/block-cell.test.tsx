@@ -15,8 +15,6 @@ function makeBlock(overrides: Partial<Block> = {}): Block {
     title: "專案開發",
     description: "",
     status: BlockStatus.Planned,
-    keyResultId: null,
-    projectId: null,
     suppressed: false,
     regretted: false,
     ...overrides,
@@ -37,8 +35,6 @@ describe("BlockCell", () => {
             title: "專案開發",
             description: "",
             status: BlockStatus.Planned,
-            keyResultId: null,
-            projectId: null,
             suppressed: false,
             regretted: false,
           }}
@@ -92,8 +88,6 @@ describe("BlockCell", () => {
             title: "Done",
             description: "",
             status: BlockStatus.Completed,
-            keyResultId: null,
-            projectId: null,
             suppressed: false,
             regretted: false,
           }}
