@@ -15,6 +15,9 @@ import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { WeekStartBanner } from "@/presentation/components/dashboard/week-start-banner";
+import { FocusBanner } from "@/presentation/components/dashboard/focus-banner";
+import { useDirections } from "@/presentation/providers/direction-provider";
+import { weekTrajectory } from "@/domain/usecases/direction-trajectory";
 import { RhythmBar } from "@/presentation/components/dashboard/rhythm-bar";
 import { isRhythmBlockId } from "@/domain/usecases/project-rhythm-onto-week";
 import {
@@ -34,6 +37,7 @@ import { PlanChangeDialog } from "@/presentation/components/plan-change-dialog/p
 import type { PlanChangeAction } from "@/domain/entities/plan-change";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
 import {
+  addWeeks,
   getCellDate,
   formatDateKey,
   isSameLocalDay,
@@ -293,7 +297,26 @@ export default function DashboardPage() {
     loadPlanChanges(weekKey);
   }, [weekKey, loadPlanChanges]);
 
+  // What last week's review asked this week to pull back, if anything.
+  const { directions, weekFocus, loadWeekFocus } = useDirections();
+  const focusDirection =
+    directions.find((d) => d.id === weekFocus[weekKey]) ?? null;
+  const previousWeekKey = addWeeks(weekKey, -1);
 
+  useEffect(() => {
+    loadWeekFocus(weekKey);
+  }, [weekKey, loadWeekFocus]);
+
+  useEffect(() => {
+    if (focusDirection) loadWeek(previousWeekKey);
+  }, [focusDirection, previousWeekKey, loadWeek]);
+
+  const blocksForDirection = (key: string) =>
+    focusDirection
+      ? (weekTrajectory(key, getBlocksForWeek(key), directions).byDirection[
+          focusDirection.id
+        ] ?? 0)
+      : 0;
 
   // Force a re-render every second while a timer is running
   useEffect(() => {
@@ -620,6 +643,13 @@ export default function DashboardPage() {
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
+          {focusDirection && (
+            <FocusBanner
+              direction={focusDirection}
+              count={blocksForDirection(weekKey)}
+              previousCount={blocksForDirection(previousWeekKey)}
+            />
+          )}
           <RhythmBar
             rhythmSlotCount={rhythmSlots.length}
             weekBlockCount={blocks.length}
