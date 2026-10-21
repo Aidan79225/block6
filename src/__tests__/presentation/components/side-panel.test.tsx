@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 
 vi.mock("@/presentation/providers/app-state-provider", () => ({
@@ -7,6 +8,7 @@ vi.mock("@/presentation/providers/app-state-provider", () => ({
 }));
 
 import { SidePanel } from "@/presentation/components/side-panel/side-panel";
+import { BlockType, BlockStatus } from "@/domain/entities/block";
 
 type SidePanelProps = ComponentProps<typeof SidePanel>;
 
@@ -35,6 +37,7 @@ function makeProps(overrides: Partial<SidePanelProps> = {}): SidePanelProps {
     onAddManualTimer: noop,
     onClearTimer: noop,
     onClose: noop,
+    onDeleteBlock: noop,
     keyResultOptions: [],
     onLinkBlockKeyResult: noop,
     projectOptions: [],
@@ -73,9 +76,7 @@ describe("SidePanel diary rendering", () => {
 
   it('renders neither form nor read-only view when diaryMode is "readonly" and diaryLines is null', () => {
     render(
-      <SidePanel
-        {...makeProps({ diaryMode: "readonly", diaryLines: null })}
-      />,
+      <SidePanel {...makeProps({ diaryMode: "readonly", diaryLines: null })} />,
     );
     // Neither DiaryForm nor DiaryReadOnlyView is rendered
     expect(screen.queryByPlaceholderText(/Bad — /)).toBeNull();
@@ -95,5 +96,59 @@ describe("SidePanel diary rendering", () => {
     expect(screen.queryByPlaceholderText(/Bad — /)).toBeNull();
     // DiaryReadOnlyView values are absent despite diaryLines being provided
     expect(screen.queryByText("分心")).toBeNull();
+  });
+});
+
+describe("SidePanel block deletion", () => {
+  const block = {
+    id: "b1",
+    weekPlanId: "wp-1",
+    dayOfWeek: 1,
+    slot: 1,
+    blockType: BlockType.Core,
+    title: "專案開發",
+    description: "",
+    status: BlockStatus.Planned,
+    keyResultId: null,
+    projectId: null,
+  };
+
+  it("offers no delete control when the slot is still empty", () => {
+    render(<SidePanel {...makeProps({ block: null })} />);
+    expect(screen.queryByRole("button", { name: "刪除區塊" })).toBeNull();
+  });
+
+  it("asks for confirmation before deleting", async () => {
+    const user = userEvent.setup();
+    let deleted = 0;
+    render(
+      <SidePanel
+        {...makeProps({ block, onDeleteBlock: () => (deleted += 1) })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "刪除區塊" }));
+    expect(deleted).toBe(0);
+
+    await user.click(screen.getByRole("button", { name: "確認刪除" }));
+    expect(deleted).toBe(1);
+  });
+
+  it("lets the user back out of the confirmation", async () => {
+    const user = userEvent.setup();
+    let deleted = 0;
+    render(
+      <SidePanel
+        {...makeProps({ block, onDeleteBlock: () => (deleted += 1) })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "刪除區塊" }));
+    await user.click(screen.getByRole("button", { name: "取消" }));
+
+    expect(deleted).toBe(0);
+    expect(
+      screen.getByRole("button", { name: "刪除區塊" }),
+    ).toBeInTheDocument();
   });
 });
