@@ -27,6 +27,11 @@ import {
   type Selection,
 } from "@/presentation/components/dashboard/selection";
 import { RangeNamingPanel } from "@/presentation/components/side-panel/range-naming-panel";
+import {
+  DiaryPanel,
+  type DiaryDay,
+} from "@/presentation/components/side-panel/diary-panel";
+import { currentDiaryDay, diaryModeFor } from "@/domain/usecases/diary-window";
 import type { SlotPosition } from "@/domain/usecases/slot-range";
 import {
   rangeNeedsReason,
@@ -44,25 +49,6 @@ import {
 } from "@/lib/date-helpers";
 
 const INTRO_STORAGE_KEY = "block6:hasSeenIntro";
-
-type DiaryMode = "editable" | "readonly" | "hidden";
-
-function isDiaryEditableDay(cellDate: Date, now: Date): boolean {
-  // Diary day = today if now >= 08:00, else yesterday
-  const diaryDay = new Date(now);
-  if (diaryDay.getHours() < 8) {
-    diaryDay.setDate(diaryDay.getDate() - 1);
-  }
-  return isSameLocalDay(cellDate, diaryDay);
-}
-
-function getDiaryMode(cellDate: Date, now: Date): DiaryMode {
-  if (isDiaryEditableDay(cellDate, now)) return "editable";
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  if (cellDate.getTime() < startOfToday.getTime()) return "readonly";
-  return "hidden";
-}
 
 function isLockedDay(cellDate: Date, now: Date): boolean {
   return isSameLocalDay(cellDate, now);
@@ -471,14 +457,42 @@ export default function DashboardPage() {
     await removeBlock(block.id);
   };
 
+  // The diary on its own, for a day of the viewed week (null = closed).
+  const [diaryDateKey, setDiaryDateKey] = useState<string | null>(null);
+  const diaryDays: DiaryDay[] = [1, 2, 3, 4, 5, 6, 7].map((dow) => {
+    const date = getCellDate(weekStart, dow);
+    return {
+      dateKey: formatDateKey(date),
+      label: `週${"一二三四五六日"[dow - 1]} ${date.getMonth() + 1}/${date.getDate()}`,
+      mode: diaryModeFor(date, new Date()),
+    };
+  });
+
+  // Stays shut once the viewed week no longer holds the open day.
+  const openDiaryDay = diaryDays.find((d) => d.dateKey === diaryDateKey);
+
+  const openDiary = () => {
+    const today = formatDateKey(currentDiaryDay(new Date()));
+    const open = diaryDays.filter((d) => d.mode !== "hidden");
+    setSelection(null);
+    setDiaryDateKey(
+      open.some((d) => d.dateKey === today)
+        ? today
+        : (open.at(-1)?.dateKey ?? diaryDays[0].dateKey),
+    );
+    for (const d of diaryDays) loadDiary(d.dateKey);
+  };
+
   const handleBlockClick = (
     dayOfWeek: number,
     slot: number,
     extend = false,
-  ) =>
+  ) => {
+    setDiaryDateKey(null);
     setSelection(
       selectionAfterClick(selection, blocks, { dayOfWeek, slot }, extend),
     );
+  };
 
   /** How today's plan lock sees a range: which days are locked, what's filled. */
   const rangeLockView = (slots: SlotPosition[]) => {
@@ -640,6 +654,7 @@ export default function DashboardPage() {
         onToggleTheme={toggleTheme}
         onSignOut={signOut}
         onTitleClick={() => setIntroOpen(true)}
+        onOpenDiary={openDiary}
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
@@ -787,6 +802,18 @@ export default function DashboardPage() {
             </div>
           </div>
         </main>
+        {openDiaryDay && (
+          <DiaryPanel
+            days={diaryDays}
+            selectedDateKey={openDiaryDay.dateKey}
+            onSelectDay={setDiaryDateKey}
+            lines={getDiary(openDiaryDay.dateKey)}
+            onSave={(bad, good, next) =>
+              saveDiary(openDiaryDay.dateKey, bad, good, next)
+            }
+            onClose={() => setDiaryDateKey(null)}
+          />
+        )}
         {selection?.kind === "range" && (
           <RangeNamingPanel
             slotCount={selection.slots.length}
@@ -801,7 +828,7 @@ export default function DashboardPage() {
             slot={selectedSlot}
             block={selectedBlock}
             diaryLines={getDiary(formatDateKey(getCellDate(weekStart, selectedDayOfWeek)))}
-            diaryMode={getDiaryMode(
+            diaryMode={diaryModeFor(
               getCellDate(weekStart, selectedDayOfWeek),
               new Date(),
             )}
