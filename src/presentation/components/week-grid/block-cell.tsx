@@ -1,9 +1,10 @@
 "use client";
 
 import type { Block } from "@/domain/entities/block";
-import { BlockType, BlockStatus } from "@/domain/entities/block";
+import { BlockStatus } from "@/domain/entities/block";
 import type { MouseEvent } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { BLOCK_TYPE_COLOR } from "@/presentation/components/block-type-color";
 
 interface BlockCellProps {
   block: Block | null;
@@ -15,13 +16,6 @@ interface BlockCellProps {
   onToggleComplete?: () => void;
   isFromRhythm?: boolean;
 }
-
-const typeColorMap: Record<BlockType, string> = {
-  [BlockType.Core]: "var(--color-block-core)",
-  [BlockType.Rest]: "var(--color-block-rest)",
-  [BlockType.Buffer]: "var(--color-block-buffer)",
-  [BlockType.General]: "var(--color-block-general)",
-};
 
 const statusIcon: Record<BlockStatus, string> = {
   [BlockStatus.Planned]: "○",
@@ -97,7 +91,7 @@ export function BlockCell({
     );
   }
 
-  const borderColor = typeColorMap[block.blockType];
+  const borderColor = BLOCK_TYPE_COLOR[block.blockType];
   const isCompleted = block.status === BlockStatus.Completed;
 
   // The status toggle is a real button, so it cannot live inside the cell

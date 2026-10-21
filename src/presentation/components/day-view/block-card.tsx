@@ -1,5 +1,6 @@
 import type { Block } from "@/domain/entities/block";
-import { BlockType, BlockStatus } from "@/domain/entities/block";
+import { BlockStatus } from "@/domain/entities/block";
+import { BLOCK_TYPE_COLOR } from "@/presentation/components/block-type-color";
 
 interface BlockCardProps {
   block: Block | null;
@@ -12,13 +13,6 @@ interface BlockCardProps {
 
 const SELECTED_OUTLINE = "2px solid var(--color-accent)";
 const SELECTED_OUTLINE_OFFSET = "1px";
-
-const typeColorMap: Record<BlockType, string> = {
-  [BlockType.Core]: "var(--color-block-core)",
-  [BlockType.Rest]: "var(--color-block-rest)",
-  [BlockType.Buffer]: "var(--color-block-buffer)",
-  [BlockType.General]: "var(--color-block-general)",
-};
 
 const statusLabel: Record<BlockStatus, string> = {
   [BlockStatus.Planned]: "",
@@ -59,7 +53,7 @@ export function BlockCard({
       </button>
     );
   }
-  const borderColor = typeColorMap[block.blockType];
+  const borderColor = BLOCK_TYPE_COLOR[block.blockType];
   const isCompleted = block.status === BlockStatus.Completed;
   return (
     <div
