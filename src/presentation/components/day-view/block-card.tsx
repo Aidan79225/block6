@@ -7,6 +7,7 @@ interface BlockCardProps {
   isSelected?: boolean;
   onClick: () => void;
   onToggleComplete?: () => void;
+  isFromRhythm?: boolean;
 }
 
 const SELECTED_OUTLINE = "2px solid var(--color-accent)";
@@ -32,6 +33,7 @@ export function BlockCard({
   isSelected,
   onClick,
   onToggleComplete,
+  isFromRhythm,
 }: BlockCardProps) {
   if (!block) {
     return (
@@ -65,7 +67,7 @@ export function BlockCard({
         display: "flex",
         alignItems: "stretch",
         background: "var(--color-bg-secondary)",
-        borderLeft: `4px solid ${borderColor}`,
+        borderLeft: `4px ${isFromRhythm ? "dashed" : "solid"} ${borderColor}`,
         borderTop: "1px solid var(--color-border)",
         borderRight: "1px solid var(--color-border)",
         borderBottom: "1px solid var(--color-border)",
@@ -91,9 +93,10 @@ export function BlockCard({
       >
         <div
           style={{
-            color: block.title
-              ? "var(--color-text-primary)"
-              : "var(--color-text-muted)",
+            color:
+              block.title && !isFromRhythm
+                ? "var(--color-text-primary)"
+                : "var(--color-text-muted)",
             fontSize: "15px",
             fontWeight: 500,
             textDecoration: isCompleted ? "line-through" : "none",

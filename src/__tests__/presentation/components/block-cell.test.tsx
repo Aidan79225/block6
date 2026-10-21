@@ -173,4 +173,33 @@ describe("BlockCell", () => {
     );
     expect(screen.getByRole("button", { name: "標記完成" })).toBeDisabled();
   });
+  it("draws rhythm-supplied cells as provisional", () => {
+    const { container, rerender } = render(
+      <DndContext>
+        <BlockCell
+          block={makeBlock({})}
+          dayOfWeek={1}
+          slot={1}
+          onClick={() => {}}
+          isFromRhythm
+        />
+      </DndContext>,
+    );
+    const rhythmCell = container.querySelector("button");
+    expect(rhythmCell?.style.borderLeft).toContain("dashed");
+
+    rerender(
+      <DndContext>
+        <BlockCell
+          block={makeBlock({})}
+          dayOfWeek={1}
+          slot={1}
+          onClick={() => {}}
+        />
+      </DndContext>,
+    );
+    expect(container.querySelector("button")?.style.borderLeft).toContain(
+      "solid",
+    );
+  });
 });
