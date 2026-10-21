@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { BlockType } from "@/domain/entities/block";
 import { TaskTitleAutocomplete } from "./task-title-autocomplete";
+import { BlockTypePicker } from "./block-type-picker";
 import { ProjectStepChecklist } from "./project-step-checklist";
 import { useAppState } from "@/presentation/providers/app-state-provider";
 
@@ -23,21 +24,6 @@ interface BlockEditorProps {
   onLinkProject: (projectId: string | null) => void;
 }
 
-const typeOptions: { value: BlockType; label: string; color: string }[] = [
-  { value: BlockType.Core, label: "核心", color: "var(--color-block-core)" },
-  { value: BlockType.Rest, label: "休息", color: "var(--color-block-rest)" },
-  {
-    value: BlockType.Buffer,
-    label: "緩衝",
-    color: "var(--color-block-buffer)",
-  },
-  {
-    value: BlockType.General,
-    label: "一般",
-    color: "var(--color-block-general)",
-  },
-];
-
 export function BlockEditor({
   title: initialTitle,
   description: initialDescription,
@@ -58,35 +44,7 @@ export function BlockEditor({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-      <div style={{ display: "flex", gap: "6px" }}>
-        {typeOptions.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setBlockType(opt.value)}
-            style={{
-              padding: "4px 12px",
-              borderRadius: "var(--radius-sm)",
-              border:
-                blockType === opt.value
-                  ? `2px solid ${opt.color}`
-                  : "1px solid var(--color-border)",
-              background:
-                blockType === opt.value
-                  ? opt.color
-                  : "var(--color-bg-tertiary)",
-              color:
-                blockType === opt.value
-                  ? "var(--color-bg-primary)"
-                  : "var(--color-text-secondary)",
-              cursor: "pointer",
-              fontSize: "13px",
-              fontWeight: blockType === opt.value ? 600 : 400,
-            }}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      <BlockTypePicker value={blockType} onChange={setBlockType} />
       <TaskTitleAutocomplete
         value={title}
         suggestions={taskTitleSuggestions}
