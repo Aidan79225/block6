@@ -9,6 +9,7 @@ interface DayViewProps {
   onBlockClick: (dayOfWeek: number, slot: number) => void;
   onPreviousDay?: () => void;
   onNextDay?: () => void;
+  onToggleComplete?: (blockId: string) => void;
 }
 const SLOTS = [1, 2, 3, 4, 5, 6];
 const DAY_LABELS = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
@@ -21,6 +22,7 @@ export function DayView({
   onBlockClick,
   onPreviousDay,
   onNextDay,
+  onToggleComplete,
 }: DayViewProps) {
   function findBlock(slot: number): Block | null {
     return (
@@ -91,6 +93,11 @@ export function DayView({
               selectedDayOfWeek === dayOfWeek && selectedSlot === slot
             }
             onClick={() => onBlockClick(dayOfWeek, slot)}
+            onToggleComplete={
+              block && onToggleComplete
+                ? () => onToggleComplete(block.id)
+                : undefined
+            }
           />
         );
       })}
