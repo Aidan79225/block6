@@ -15,6 +15,10 @@ Code review 找到、但超出單次修正範圍的項目。修掉一項就把�
 
 ## 已知問題
 
+- **每週提醒只在 App 開著時送出。** 真正的推播（App 關閉也收得到）需要 Web Push：
+  VAPID 金鑰、存使用者的 subscription、加上排程送出（例如 Vercel cron）。
+  這些需要擁有者的金鑰與部署設定，所以先只做本機提醒。
+
 - **OKR / Projects 的資料表還在。** 程式碼已移除，但 `okr_cycles`、`objectives`、
   `key_results`、`projects`、`project_steps` 與 `blocks.key_result_id`、
   `blocks.project_id`、`weekly_tasks.key_result_id` 都保留，以免刪掉使用者的資料。

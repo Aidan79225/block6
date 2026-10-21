@@ -16,6 +16,8 @@ import { useAuth } from "@/presentation/providers/auth-provider";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { WeekStartBanner } from "@/presentation/components/dashboard/week-start-banner";
 import { FocusBanner } from "@/presentation/components/dashboard/focus-banner";
+import { WeeklyPromptBanner } from "@/presentation/components/dashboard/weekly-prompt-banner";
+import { useWeeklyPrompt } from "@/presentation/hooks/use-weekly-prompt";
 import { useDirections } from "@/presentation/providers/direction-provider";
 import { weekTrajectory } from "@/domain/usecases/direction-trajectory";
 import { RhythmBar } from "@/presentation/components/dashboard/rhythm-bar";
@@ -282,6 +284,8 @@ export default function DashboardPage() {
   useEffect(() => {
     loadPlanChanges(weekKey);
   }, [weekKey, loadPlanChanges]);
+
+  const weeklyPrompt = useWeeklyPrompt();
 
   // What last week's review asked this week to pull back, if anything.
   const { directions, weekFocus, loadWeekFocus } = useDirections();
@@ -658,6 +662,18 @@ export default function DashboardPage() {
       />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, padding: "16px", overflow: "auto" }}>
+          {weeklyPrompt.due && (
+            <WeeklyPromptBanner
+              canRemind={weeklyPrompt.canRemind}
+              remindEnabled={weeklyPrompt.remindEnabled}
+              onDismiss={weeklyPrompt.dismiss}
+              onEnableReminder={async () => {
+                if (await weeklyPrompt.enableReminder()) {
+                  notify.info("每週一早上 8 點會提醒你");
+                }
+              }}
+            />
+          )}
           {focusDirection && (
             <FocusBanner
               direction={focusDirection}
