@@ -1,10 +1,6 @@
 import type { Block } from "../entities/block";
 import type { RhythmSlot } from "../entities/rhythm-slot";
-
-interface SlotPosition {
-  readonly dayOfWeek: number;
-  readonly slot: number;
-}
+import type { SlotPosition } from "./slot-range";
 
 export interface BlockMovePlan {
   /**

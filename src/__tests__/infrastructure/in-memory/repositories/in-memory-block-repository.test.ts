@@ -65,4 +65,15 @@ describe("InMemoryBlockRepository", () => {
     const repo = new InMemoryBlockRepository();
     expect(await repo.findByWeekPlan("missing")).toEqual([]);
   });
+
+  it("saveAll inserts new blocks and replaces stored ones", async () => {
+    const repo = new InMemoryBlockRepository();
+    await repo.save(makeBlock({ id: "a", title: "old" }));
+    await repo.saveAll([
+      makeBlock({ id: "a", title: "new" }),
+      makeBlock({ id: "b", slot: 2 }),
+    ]);
+    expect((await repo.findById("a"))?.title).toBe("new");
+    expect(await repo.findByWeekPlan("wp-1")).toHaveLength(2);
+  });
 });
