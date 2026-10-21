@@ -201,7 +201,8 @@ export async function findMostRecentWeekWithBlocks(
     const { count, error: countErr } = await supabase
       .from("blocks")
       .select("id", { count: "exact", head: true })
-      .eq("week_plan_id", plan.id);
+      .eq("week_plan_id", plan.id)
+      .eq("suppressed", false);
     if (countErr) throw new Error(countErr.message);
     if ((count ?? 0) > 0) return plan.week_start;
   }
