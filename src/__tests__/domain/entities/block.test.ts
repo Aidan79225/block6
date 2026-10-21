@@ -52,5 +52,4 @@ describe("Block", () => {
       }),
     ).toThrow("slot must be between 1 and 6");
   });
-
 });

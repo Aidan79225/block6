@@ -41,5 +41,4 @@ describe("WeeklyTask", () => {
       }),
     ).toThrow("position must be non-negative");
   });
-
 });
