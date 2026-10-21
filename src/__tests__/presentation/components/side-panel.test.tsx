@@ -111,6 +111,7 @@ describe("SidePanel block deletion", () => {
     status: BlockStatus.Planned,
     keyResultId: null,
     projectId: null,
+    suppressed: false,
   };
 
   it("offers no delete control when the slot is still empty", () => {

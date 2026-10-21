@@ -25,6 +25,7 @@ describe("GetWeekSummaryUseCase", () => {
         status: BlockStatus.Completed,
         keyResultId: null,
         projectId: null,
+        suppressed: false,
       },
       {
         id: "b2",
@@ -37,6 +38,7 @@ describe("GetWeekSummaryUseCase", () => {
         status: BlockStatus.Planned,
         keyResultId: null,
         projectId: null,
+        suppressed: false,
       },
       {
         id: "b3",
@@ -49,6 +51,7 @@ describe("GetWeekSummaryUseCase", () => {
         status: BlockStatus.Completed,
         keyResultId: null,
         projectId: null,
+        suppressed: false,
       },
       {
         id: "b4",
@@ -61,6 +64,7 @@ describe("GetWeekSummaryUseCase", () => {
         status: BlockStatus.Planned,
         keyResultId: null,
         projectId: null,
+        suppressed: false,
       },
     ];
     vi.mocked(repo.findByWeekPlan).mockResolvedValue(blocks);
