@@ -2,6 +2,7 @@
 
 import type { Block } from "@/domain/entities/block";
 import { BlockType, BlockStatus } from "@/domain/entities/block";
+import type { MouseEvent } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 interface BlockCellProps {
@@ -9,7 +10,8 @@ interface BlockCellProps {
   dayOfWeek: number;
   slot: number;
   isSelected?: boolean;
-  onClick: () => void;
+  /** Receives the click so callers can read modifiers such as Shift. */
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   onToggleComplete?: () => void;
   isFromRhythm?: boolean;
 }
