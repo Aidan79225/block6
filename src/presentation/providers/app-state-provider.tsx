@@ -69,7 +69,16 @@ import {
 import type { RhythmSlot } from "@/domain/entities/rhythm-slot";
 import { createRhythmSlot } from "@/domain/entities/rhythm-slot";
 import type { Rhythm } from "@/domain/entities/rhythm";
-import { createRhythm, rhythmSlotsForWeek } from "@/domain/entities/rhythm";
+import {
+  adoptRhythm,
+  createRhythm,
+  latestRhythmSlots,
+  rhythmSlotsForWeek,
+} from "@/domain/entities/rhythm";
+import {
+  rhythmSlotsFromWeek,
+  rhythmStartAfter,
+} from "@/domain/usecases/set-rhythm";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
 import { parseDateKey } from "@/lib/date-helpers";
 
@@ -88,6 +97,10 @@ interface AppState {
     currentWeekKey: string,
   ) => Promise<{ copied: number; sourceWeekKey: string | null }>;
   applyWeekTemplate: (weekKey: string) => Promise<number>;
+  /** The newest rhythm — what the weeks ahead start from. */
+  rhythmSlots: readonly RhythmSlot[];
+  setRhythmFromWeek: (weekKey: string) => Promise<number>;
+  clearRhythm: () => Promise<void>;
   deleteBlock: (blockId: string) => Promise<void>;
   planChanges: Record<string, PlanChange[]>;
   loadPlanChanges: (weekKey: string) => Promise<void>;
@@ -435,6 +448,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     ? supaBlocks
     : localBlocksByWeek;
   const rhythmHistory = isLoggedIn ? supaRhythms : localData.rhythms;
+  const rhythmSlots = useMemo(
+    () => latestRhythmSlots(rhythmHistory),
+    [rhythmHistory],
+  );
 
   // Each week shows the rhythm version it was planned under, so a later
   // change to the rhythm never rewrites a week that has already started.
@@ -882,9 +899,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           user.id,
           currentWeekKey,
         );
-        const occupied = new Set(
-          currentBlocksInDb.map((b) => `${b.dayOfWeek}-${b.slot}`),
-        );
+        const occupied = new Set([
+          ...currentBlocksInDb.map((b) => `${b.dayOfWeek}-${b.slot}`),
+          // The rhythm already shows something in these cells; the user asked
+          // to fill the empty ones, not to overwrite their standing plan.
+          ...rhythmSlotsForWeek(rhythmHistoryRef.current, currentWeekKey).map(
+            (r) => `${r.dayOfWeek}-${r.slot}`,
+          ),
+        ]);
 
         let inserted = 0;
         for (const prevBlock of prevBlocks) {
@@ -933,7 +955,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         // The DB is the source of truth for what is occupied; local state can
         // lag behind a copy or a save that is still in flight.
         const existing = await fetchBlocksForWeek(user.id, weekKey);
-        const slots = buildWeekTemplate(existing);
+        const slots = buildWeekTemplate([
+          ...existing,
+          ...rhythmSlotsForWeek(rhythmHistoryRef.current, weekKey),
+        ]);
         if (slots.length === 0) return 0;
         try {
           await insertBlocks(user.id, weekKey, slots);
@@ -946,7 +971,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       const current = loadFromStorage();
       const existing = current.blocks.filter((b) => b.weekPlanId === weekKey);
-      const slots = buildWeekTemplate(existing);
+      const slots = buildWeekTemplate([
+        ...existing,
+        ...rhythmSlotsForWeek(current.rhythms, weekKey),
+      ]);
       if (slots.length === 0) return 0;
       for (const slot of slots) {
         current.blocks.push(
@@ -966,6 +994,53 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       return slots.length;
     },
     [user, loadWeek],
+  );
+
+  /** Adopt `slots` as the rhythm for the weeks after this one. */
+  const adoptRhythmSlots = useCallback(
+    async (slots: readonly RhythmSlot[]): Promise<void> => {
+      if (user) {
+        const saved = await useCases.setRhythm.execute({
+          userId: user.id,
+          slots,
+          today: new Date(),
+        });
+        setSupaRhythms((prev) => adoptRhythm(prev, saved));
+        return;
+      }
+      const current = loadFromStorage();
+      current.rhythms = adoptRhythm(
+        current.rhythms,
+        createRhythm({
+          id: crypto.randomUUID(),
+          userId: "local",
+          effectiveFrom: rhythmStartAfter(new Date()),
+          slots,
+        }),
+      );
+      saveToStorage(current);
+    },
+    [user, useCases],
+  );
+
+  /**
+   * Adopt a week as the recurring rhythm. This is how the rhythm gets built:
+   * arrange one week the way a typical week looks, then promote it — rather
+   * than asking the user to fill in a separate 42-slot settings screen, which
+   * would only move the planning cost, not remove it.
+   */
+  const setRhythmFromWeek = useCallback(
+    async (weekKey: string): Promise<number> => {
+      const slots = rhythmSlotsFromWeek(getBlocksForWeek(weekKey));
+      await adoptRhythmSlots(slots);
+      return slots.length;
+    },
+    [getBlocksForWeek, adoptRhythmSlots],
+  );
+
+  const clearRhythm = useCallback(
+    () => adoptRhythmSlots([]),
+    [adoptRhythmSlots],
   );
 
   const deleteBlock = useCallback(
@@ -1659,6 +1734,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         updateStatus,
         copyRecentWeekPlan,
         applyWeekTemplate,
+        rhythmSlots,
+        setRhythmFromWeek,
+        clearRhythm,
         deleteBlock,
         planChanges,
         loadPlanChanges,
