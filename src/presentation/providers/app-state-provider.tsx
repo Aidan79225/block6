@@ -65,6 +65,8 @@ import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import { buildWeekTemplate } from "@/domain/usecases/build-week-template";
 import { planBlockMove } from "@/domain/usecases/plan-block-move";
+import { nameBlocks } from "@/domain/usecases/name-slots";
+import type { SlotPosition } from "@/domain/usecases/slot-range";
 import {
   projectRhythmOntoWeek,
   parseRhythmBlockId,
@@ -95,6 +97,12 @@ interface AppState {
     description: string,
     blockType: BlockType,
   ) => Block;
+  nameSlots: (
+    weekKey: string,
+    slots: readonly SlotPosition[],
+    title: string,
+    blockType: BlockType,
+  ) => Promise<void>;
   updateStatus: (blockId: string, status: BlockStatus) => void;
   copyRecentWeekPlan: (
     currentWeekKey: string,
@@ -847,6 +855,60 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [user, notify, useCases],
+  );
+
+  /**
+   * Give a range of slots one type and title. Optimistic like saveBlock, but
+   * written as one batch: a whole week's range is one round trip, and the
+   * week plan is created once rather than raced for by every cell.
+   */
+  const nameSlots = useCallback(
+    async (
+      weekKey: string,
+      slots: readonly SlotPosition[],
+      title: string,
+      blockType: BlockType,
+    ): Promise<void> => {
+      const naming = { slots, title, blockType };
+      if (user) {
+        setSupaBlocks((prev) =>
+          nameBlocks(prev[weekKey] ?? [], {
+            ...naming,
+            weekPlanId: weekKey,
+          }).reduce((acc, b) => withBlockInSlot(acc, weekKey, b), prev),
+        );
+        try {
+          const weekPlanId = await getOrCreateWeekPlan(user.id, weekKey);
+          const saved = await useCases.nameSlots.execute({
+            ...naming,
+            weekPlanId,
+          });
+          setSupaBlocks((prev) =>
+            saved.reduce((acc, b) => withBlockInSlot(acc, weekKey, b), prev),
+          );
+        } catch (err) {
+          console.error(err);
+          notify.error("批次命名失敗");
+          loadedWeeks.current.delete(weekKey);
+          loadWeek(weekKey);
+          throw err;
+        }
+        return;
+      }
+
+      const current = loadFromStorage();
+      const named = nameBlocks(
+        current.blocks.filter((b) => b.weekPlanId === weekKey),
+        { ...naming, weekPlanId: weekKey },
+      );
+      const namedIds = new Set(named.map((b) => b.id));
+      current.blocks = [
+        ...current.blocks.filter((b) => !namedIds.has(b.id)),
+        ...named,
+      ];
+      saveToStorage(current);
+    },
+    [user, notify, useCases, loadWeek],
   );
 
   const updateStatus = useCallback(
@@ -1911,6 +1973,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       value={{
         getBlocksForWeek,
         saveBlock,
+        nameSlots,
         updateStatus,
         copyRecentWeekPlan,
         applyWeekTemplate,
