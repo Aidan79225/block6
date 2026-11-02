@@ -50,7 +50,6 @@ import {
   removeWeeklyTaskCompletion as dbRemoveWeeklyTaskCompletion,
   fetchPlanChangesForWeek,
   insertPlanChange,
-  dbSetWeeklyTaskKeyResult,
   findMostRecentWeekWithBlocks,
   insertBlocks,
   deleteBlock as dbDeleteBlock,
@@ -59,8 +58,6 @@ import {
   saveRhythmVersion,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
-import type { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
-import type { ProjectStep } from "@/domain/entities/project-step";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import { buildWeekTemplate } from "@/domain/usecases/build-week-template";
@@ -168,20 +165,6 @@ interface AppState {
     weekKey: string,
     now: Date,
   ) => Array<{ title: string; totalSeconds: number }>;
-  keyResultOptions: KeyResultOption[];
-  loadKeyResultOptions: (weekStart: Date) => void;
-  linkBlockToKeyResult: (blockId: string, keyResultId: string | null) => void;
-  linkWeeklyTaskToKeyResult: (id: string, keyResultId: string | null) => void;
-  projectOptions: { projectId: string; title: string }[];
-  loadProjectOptions: () => void;
-  linkBlockToProject: (blockId: string, projectId: string | null) => void;
-  projectSteps: Record<string, ProjectStep[]>;
-  loadProjectSteps: (projectId: string) => void;
-  toggleProjectStepCompleted: (
-    projectId: string,
-    stepId: string,
-    completed: boolean,
-  ) => void;
 }
 
 // --- localStorage helpers ---
@@ -480,15 +463,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [weeklyTasks, setWeeklyTasks] = useState<WeeklyTask[]>([]);
   const [weeklyCompletions, setWeeklyCompletions] = useState<
     Record<string, Set<string>>
-  >({});
-  const [keyResultOptions, setKeyResultOptions] = useState<KeyResultOption[]>(
-    [],
-  );
-  const [projectOptions, setProjectOptions] = useState<
-    { projectId: string; title: string }[]
-  >([]);
-  const [projectSteps, setProjectSteps] = useState<
-    Record<string, ProjectStep[]>
   >({});
 
   const [planChanges, setPlanChanges] = useState<Record<string, PlanChange[]>>(
@@ -1760,117 +1734,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [weeklyCompletions, notify],
   );
 
-  const loadKeyResultOptions = useCallback(
-    (weekStart: Date) => {
-      if (!user) {
-        Promise.resolve().then(() => setKeyResultOptions([]));
-        return;
-      }
-      useCases.listKeyResultsForWeek
-        .execute(user.id, weekStart)
-        .then((opts) => setKeyResultOptions(opts))
-        .catch((err) => {
-          console.error(err);
-          setKeyResultOptions([]);
-        });
-    },
-    [user, useCases],
-  );
-
-  const linkBlockToKeyResult = useCallback(
-    async (rawBlockId: string, keyResultId: string | null) => {
-      const blockId = await ensureRealBlock(rawBlockId);
-      if (!blockId) return;
-      setSupaBlocks((prev) => withBlockChanged(prev, blockId, { keyResultId }));
-      useCases.linkBlockToKeyResult
-        .execute(blockId, keyResultId)
-        .catch((err) => {
-          console.error(err);
-          notify.error("區塊歸屬 KR 失敗");
-        });
-    },
-    [useCases, notify, ensureRealBlock],
-  );
-
-  const linkWeeklyTaskToKeyResult = useCallback(
-    (id: string, keyResultId: string | null) => {
-      setWeeklyTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, keyResultId } : t)),
-      );
-      dbSetWeeklyTaskKeyResult(id, keyResultId).catch((err) => {
-        console.error(err);
-        notify.error("週任務歸屬 KR 失敗");
-      });
-    },
-    [notify],
-  );
-
-  const loadProjectOptions = useCallback(() => {
-    if (!user) {
-      Promise.resolve().then(() => setProjectOptions([]));
-      return;
-    }
-    useCases.listProjects
-      .execute(user.id)
-      .then((projects) =>
-        setProjectOptions(
-          projects
-            .filter((p) => p.status === "active")
-            .map((p) => ({ projectId: p.id, title: p.title })),
-        ),
-      )
-      .catch((err) => {
-        console.error(err);
-        setProjectOptions([]);
-      });
-  }, [user, useCases]);
-
-  const linkBlockToProject = useCallback(
-    async (rawBlockId: string, projectId: string | null) => {
-      const blockId = await ensureRealBlock(rawBlockId);
-      if (!blockId) return;
-      setSupaBlocks((prev) => withBlockChanged(prev, blockId, { projectId }));
-      useCases.linkBlockToProject.execute(blockId, projectId).catch((err) => {
-        console.error(err);
-        notify.error("區塊歸屬專案失敗");
-      });
-    },
-    [useCases, notify, ensureRealBlock],
-  );
-
-  const loadProjectSteps = useCallback(
-    (projectId: string) => {
-      useCases.listProjectStepsByProject
-        .execute(projectId)
-        .then((steps) =>
-          setProjectSteps((prev) => ({ ...prev, [projectId]: steps })),
-        )
-        .catch((err) => {
-          console.error(err);
-          notify.error("載入專案步驟失敗");
-        });
-    },
-    [useCases, notify],
-  );
-
-  const toggleProjectStepCompleted = useCallback(
-    (projectId: string, stepId: string, completed: boolean) => {
-      setProjectSteps((prev) => ({
-        ...prev,
-        [projectId]: (prev[projectId] ?? []).map((s) =>
-          s.id === stepId ? { ...s, completed } : s,
-        ),
-      }));
-      useCases.toggleProjectStepCompleted
-        .execute(stepId, completed)
-        .catch((err) => {
-          console.error(err);
-          notify.error("步驟狀態更新失敗");
-        });
-    },
-    [useCases, notify],
-  );
-
   const getTaskTimeRanking = useCallback(
     (weekKey: string, now: Date) => {
       const weekBlocks = blocksByWeek[weekKey] ?? [];
@@ -2063,16 +1926,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         toggleWeeklyTaskCompletion,
         loadWeeklyCompletions,
         getTaskTimeRanking,
-        keyResultOptions,
-        loadKeyResultOptions,
-        linkBlockToKeyResult,
-        linkWeeklyTaskToKeyResult,
-        projectOptions,
-        loadProjectOptions,
-        linkBlockToProject,
-        projectSteps,
-        loadProjectSteps,
-        toggleProjectStepCompleted,
       }}
     >
       {children}
