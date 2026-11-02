@@ -15,6 +15,7 @@ const block: Block = {
   keyResultId: null,
   projectId: null,
   suppressed: false,
+  regretted: false,
 };
 
 const makeRepo = (): BlockRepository => ({

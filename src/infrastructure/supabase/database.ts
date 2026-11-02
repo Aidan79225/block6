@@ -54,6 +54,7 @@ interface DbBlock {
   key_result_id: string | null;
   project_id: string | null;
   suppressed?: boolean | null;
+  regretted?: boolean | null;
 }
 
 function dbBlockToEntity(db: DbBlock): Block {
@@ -69,6 +70,7 @@ function dbBlockToEntity(db: DbBlock): Block {
     keyResultId: db.key_result_id ?? null,
     projectId: db.project_id ?? null,
     suppressed: db.suppressed ?? false,
+    regretted: db.regretted ?? false,
   });
 }
 
@@ -464,6 +466,7 @@ function blockToRow(block: Block) {
     key_result_id: block.keyResultId,
     project_id: block.projectId,
     suppressed: block.suppressed,
+    regretted: block.regretted,
   };
 }
 

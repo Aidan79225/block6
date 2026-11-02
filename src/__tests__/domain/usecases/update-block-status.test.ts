@@ -23,6 +23,7 @@ const existingBlock: Block = {
   keyResultId: null,
   projectId: null,
   suppressed: false,
+  regretted: false,
 };
 
 describe("UpdateBlockStatusUseCase", () => {

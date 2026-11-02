@@ -27,6 +27,8 @@ export interface Block {
    * recurring rhythm. Suppressed blocks are never shown as blocks.
    */
   readonly suppressed: boolean;
+  /** Marked in the weekly review as not worth the time it took. */
+  readonly regretted: boolean;
 }
 
 export interface CreateBlockInput {
@@ -41,6 +43,7 @@ export interface CreateBlockInput {
   keyResultId?: string | null;
   projectId?: string | null;
   suppressed?: boolean;
+  regretted?: boolean;
 }
 
 export function createBlock(input: CreateBlockInput): Block {
@@ -53,5 +56,6 @@ export function createBlock(input: CreateBlockInput): Block {
     keyResultId: input.keyResultId ?? null,
     projectId: input.projectId ?? null,
     suppressed: input.suppressed ?? false,
+    regretted: input.regretted ?? false,
   };
 }
