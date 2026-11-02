@@ -132,6 +132,16 @@ export function SidePanel({
           &times;
         </button>
       </div>
+      <p
+        className="desktop-only"
+        style={{
+          color: "var(--color-text-muted)",
+          fontSize: "12px",
+          margin: 0,
+        }}
+      >
+        按住 Shift 點另一格，或點上方的星期，可以一次命名一整塊
+      </p>
       <BlockEditor
         key={`editor-${dayOfWeek}-${slot}`}
         title={block?.title ?? ""}
