@@ -9,6 +9,8 @@ import { TaskTimeRanking } from "@/presentation/components/review/task-time-rank
 import { DiaryWeekView } from "@/presentation/components/review/diary-week-view";
 import { PlanChangesLog } from "@/presentation/components/review/plan-changes-log";
 import { RegretPicker } from "@/presentation/components/review/regret-picker";
+import { FocusPicker } from "@/presentation/components/review/focus-picker";
+import { useDirections } from "@/presentation/providers/direction-provider";
 import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useWeekPlan } from "@/presentation/hooks/use-week-plan";
@@ -18,6 +20,7 @@ import { getOrCreateWeekPlan } from "@/infrastructure/supabase/database";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { WeekNavigator } from "@/presentation/components/header/week-navigator";
 import {
+  addWeeks,
   getCellDate,
   formatDateKey,
 } from "@/lib/date-helpers";
@@ -45,6 +48,13 @@ export default function ReviewPage() {
 
   const weekKey = formatDateKey(weekStart);
   const blocks = getBlocksForWeek(weekKey);
+  const nextWeekKey = addWeeks(weekKey, 1);
+  const { directions, weekFocus, loadWeekFocus, setWeekFocus } =
+    useDirections();
+
+  useEffect(() => {
+    loadWeekFocus(nextWeekKey);
+  }, [nextWeekKey, loadWeekFocus]);
 
   useEffect(() => {
     loadWeek(weekKey);
@@ -182,6 +192,11 @@ export default function ReviewPage() {
         }
         rhythmSlotCount={rhythmRegrets.length}
         onRemoveFromRhythm={handleRemoveFromRhythm}
+      />
+      <FocusPicker
+        directions={directions}
+        selectedId={weekFocus[nextWeekKey] ?? null}
+        onSelect={(directionId) => void setWeekFocus(nextWeekKey, directionId)}
       />
     </div>
   );
