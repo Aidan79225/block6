@@ -242,6 +242,46 @@ export async function insertBlocks(
   return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
 }
 
+/**
+ * Create or update the block for one slot, including its status. Used to
+ * materialize a rhythm-projected cell the moment the user acts on it.
+ */
+export async function materializeBlock(
+  userId: string,
+  weekStart: string,
+  input: {
+    dayOfWeek: number;
+    slot: number;
+    blockType: BlockType;
+    title: string;
+    description: string;
+    status?: BlockStatus;
+    suppressed?: boolean;
+  },
+): Promise<Block> {
+  const weekPlanId = await getOrCreateWeekPlan(userId, weekStart);
+  const { data, error } = await supabase
+    .from("blocks")
+    .upsert(
+      {
+        week_plan_id: weekPlanId,
+        day_of_week: input.dayOfWeek,
+        slot: input.slot,
+        block_type_id: BLOCK_TYPE_MAP[input.blockType],
+        title: input.title,
+        description: input.description,
+        status: input.status ?? BlockStatus.Planned,
+        suppressed: input.suppressed ?? false,
+      },
+      { onConflict: "week_plan_id,day_of_week,slot" },
+    )
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return dbBlockToEntity(data as DbBlock);
+}
+
 // --- Rhythm ---
 
 interface DbRhythmSlot {

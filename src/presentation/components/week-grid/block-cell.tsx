@@ -11,6 +11,7 @@ interface BlockCellProps {
   isSelected?: boolean;
   onClick: () => void;
   onToggleComplete?: () => void;
+  isFromRhythm?: boolean;
 }
 
 const typeColorMap: Record<BlockType, string> = {
@@ -45,6 +46,7 @@ export function BlockCell({
   isSelected,
   onClick,
   onToggleComplete,
+  isFromRhythm,
 }: BlockCellProps) {
   const droppableId = `slot-${dayOfWeek}-${slot}`;
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: droppableId });
@@ -123,7 +125,7 @@ export function BlockCell({
           flex: 1,
           minWidth: 0,
           background: "var(--color-bg-secondary)",
-          borderLeft: `3px solid ${borderColor}`,
+          borderLeft: `3px ${isFromRhythm ? "dashed" : "solid"} ${borderColor}`,
           borderTop: "1px solid var(--color-border)",
           borderRight: "1px solid var(--color-border)",
           borderBottom: "1px solid var(--color-border)",
@@ -143,9 +145,10 @@ export function BlockCell({
           style={{
             fontWeight: 500,
             fontSize: "11px",
-            color: block.title
-              ? "var(--color-text-primary)"
-              : "var(--color-text-muted)",
+            color:
+              block.title && !isFromRhythm
+                ? "var(--color-text-primary)"
+                : "var(--color-text-muted)",
             textDecoration: isCompleted ? "line-through" : "none",
           }}
         >

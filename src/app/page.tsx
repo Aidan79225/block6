@@ -15,6 +15,7 @@ import { useAppState } from "@/presentation/providers/app-state-provider";
 import { useAuth } from "@/presentation/providers/auth-provider";
 import { useNotify } from "@/presentation/providers/notification-provider";
 import { WeekStartBanner } from "@/presentation/components/dashboard/week-start-banner";
+import { isRhythmBlockId } from "@/domain/usecases/project-rhythm-onto-week";
 import { IntroDialog } from "@/presentation/components/intro-dialog/intro-dialog";
 import { PlanChangeDialog } from "@/presentation/components/plan-change-dialog/plan-change-dialog";
 import type { PlanChangeAction } from "@/domain/entities/plan-change";
@@ -548,6 +549,7 @@ export default function DashboardPage() {
               onSwapBlocks={handleSwapBlocks}
               onMoveBlock={handleMoveBlock}
               onToggleComplete={handleToggleComplete}
+              isRhythmBlock={isRhythmBlockId}
             />
           </div>
           <div className="mobile-only">
@@ -565,6 +567,7 @@ export default function DashboardPage() {
                   mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
                 }
                 onToggleComplete={handleToggleComplete}
+                isRhythmBlock={isRhythmBlockId}
               />
             )}
             {mobileView === "overview" && (

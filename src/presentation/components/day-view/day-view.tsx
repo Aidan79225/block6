@@ -10,6 +10,7 @@ interface DayViewProps {
   onPreviousDay?: () => void;
   onNextDay?: () => void;
   onToggleComplete?: (blockId: string) => void;
+  isRhythmBlock?: (blockId: string) => boolean;
 }
 const SLOTS = [1, 2, 3, 4, 5, 6];
 const DAY_LABELS = ["", "週一", "週二", "週三", "週四", "週五", "週六", "週日"];
@@ -23,6 +24,7 @@ export function DayView({
   onPreviousDay,
   onNextDay,
   onToggleComplete,
+  isRhythmBlock,
 }: DayViewProps) {
   function findBlock(slot: number): Block | null {
     return (
@@ -98,6 +100,7 @@ export function DayView({
                 ? () => onToggleComplete(block.id)
                 : undefined
             }
+            isFromRhythm={!!block && !!isRhythmBlock?.(block.id)}
           />
         );
       })}

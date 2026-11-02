@@ -54,6 +54,7 @@ import {
   findMostRecentWeekWithBlocks,
   insertBlocks,
   deleteBlock as dbDeleteBlock,
+  materializeBlock,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
@@ -61,6 +62,14 @@ import type { ProjectStep } from "@/domain/entities/project-step";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import { buildWeekTemplate } from "@/domain/usecases/build-week-template";
+import {
+  projectRhythmOntoWeek,
+  parseRhythmBlockId,
+} from "@/domain/usecases/project-rhythm-onto-week";
+import type { RhythmSlot } from "@/domain/entities/rhythm-slot";
+import { createRhythmSlot } from "@/domain/entities/rhythm-slot";
+import type { Rhythm } from "@/domain/entities/rhythm";
+import { createRhythm, rhythmSlotsForWeek } from "@/domain/entities/rhythm";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
 import { parseDateKey } from "@/lib/date-helpers";
 
@@ -149,12 +158,14 @@ interface PersistedData {
   blocks: Block[];
   diaryEntries: Record<string, DiaryLines>;
   reflection: string;
+  rhythms: Rhythm[];
 }
 
 const EMPTY_DATA: PersistedData = {
   blocks: [],
   diaryEntries: {},
   reflection: "",
+  rhythms: [],
 };
 
 function migrateDiaryEntries(
@@ -197,10 +208,14 @@ function loadFromStorage(): PersistedData {
       diaryEntries?: Record<string, Record<string, string>>;
     };
     const blocks = (parsed.blocks ?? []).map((b) => createBlock(b));
+    const rhythms = (parsed.rhythms ?? []).map((r) =>
+      createRhythm({ ...r, slots: r.slots.map((s) => createRhythmSlot(s)) }),
+    );
     return {
       blocks,
       diaryEntries: migrateDiaryEntries(parsed.diaryEntries),
       reflection: parsed.reflection ?? "",
+      rhythms,
     };
   } catch {
     return EMPTY_DATA;
@@ -328,6 +343,18 @@ const AppStateContext = createContext<AppState | null>(null);
 // month-long break, short enough that the search stays cheap.
 const MAX_WEEKS_BACK_FOR_COPY = 8;
 
+/** `byWeek` with `block` as the only row in its slot of `weekKey`. */
+function withBlockInSlot(
+  byWeek: Record<string, Block[]>,
+  weekKey: string,
+  block: Block,
+): Record<string, Block[]> {
+  const others = (byWeek[weekKey] ?? []).filter(
+    (b) => !(b.dayOfWeek === block.dayOfWeek && b.slot === block.slot),
+  );
+  return { ...byWeek, [weekKey]: [...others, block] };
+}
+
 function locateBlock(
   byWeek: Record<string, Block[]>,
   blockId: string,
@@ -355,6 +382,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Supabase-sourced state (only used when logged in)
+  const [supaRhythms, setSupaRhythms] = useState<Rhythm[]>([]);
   const [supaBlocks, setSupaBlocks] = useState<Record<string, Block[]>>({});
   const supaBlocksRef = useRef(supaBlocks);
   useEffect(() => {
@@ -403,9 +431,24 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     return out;
   }, [localData.blocks]);
 
-  const blocksByWeek: Record<string, Block[]> = isLoggedIn
+  const storedBlocksByWeek: Record<string, Block[]> = isLoggedIn
     ? supaBlocks
     : localBlocksByWeek;
+  const rhythmHistory = isLoggedIn ? supaRhythms : localData.rhythms;
+
+  // Each week shows the rhythm version it was planned under, so a later
+  // change to the rhythm never rewrites a week that has already started.
+  const blocksByWeek = useMemo<Record<string, Block[]>>(() => {
+    const out: Record<string, Block[]> = {};
+    for (const [weekKey, overrides] of Object.entries(storedBlocksByWeek)) {
+      out[weekKey] = projectRhythmOntoWeek({
+        rhythm: rhythmSlotsForWeek(rhythmHistory, weekKey),
+        overrides,
+        weekKey,
+      });
+    }
+    return out;
+  }, [storedBlocksByWeek, rhythmHistory]);
   const diaryEntries = isLoggedIn ? supaDiary : localData.diaryEntries;
   const reflection = isLoggedIn ? supaReflection : localData.reflection;
 
@@ -455,6 +498,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         notify.error("載入週任務清單失敗");
       });
   }, [isLoggedIn, user, notify]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      Promise.resolve().then(() => setSupaRhythms([]));
+      return;
+    }
+    useCases.listRhythmHistory
+      .execute(user!.id)
+      .then((history) => setSupaRhythms(history))
+      .catch((err) => {
+        console.error(err);
+        notify.error("載入常駐節奏失敗");
+      });
+  }, [isLoggedIn, user, notify, useCases]);
 
   useEffect(() => {
     const promise = isLoggedIn
@@ -530,9 +587,81 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const getBlocksForWeek = useCallback(
     (weekKey: string): Block[] => {
-      return blocksByWeek[weekKey] ?? [];
+      const projected = blocksByWeek[weekKey];
+      if (projected) return projected;
+      // A week with nothing stored still shows the rhythm — that is the whole
+      // point: a fresh week costs zero writes.
+      return projectRhythmOntoWeek({
+        rhythm: rhythmSlotsForWeek(rhythmHistory, weekKey),
+        overrides: [],
+        weekKey,
+      });
     },
-    [blocksByWeek],
+    [blocksByWeek, rhythmHistory],
+  );
+
+  const rhythmHistoryRef = useRef(rhythmHistory);
+  useEffect(() => {
+    rhythmHistoryRef.current = rhythmHistory;
+  }, [rhythmHistory]);
+
+  /** What the rhythm governing `weekKey` puts in one slot, if anything. */
+  const rhythmSlotAt = useCallback(
+    (weekKey: string, dayOfWeek: number, slot: number): RhythmSlot | null =>
+      rhythmSlotsForWeek(rhythmHistoryRef.current, weekKey).find(
+        (r) => r.dayOfWeek === dayOfWeek && r.slot === slot,
+      ) ?? null,
+    [],
+  );
+
+  /**
+   * Turn a rhythm-projected cell into a real stored block, so that anything
+   * keyed by block id has something to write against. Real ids pass through
+   * untouched. Returns null when the rhythm slot behind the id is gone.
+   */
+  const ensureRealBlock = useCallback(
+    async (blockId: string): Promise<string | null> => {
+      const parsed = parseRhythmBlockId(blockId);
+      if (!parsed) return blockId;
+      const { weekKey, dayOfWeek, slot } = parsed;
+      const source = rhythmSlotAt(weekKey, dayOfWeek, slot);
+      if (!source) return null;
+
+      if (user) {
+        const saved = await materializeBlock(user.id, weekKey, {
+          dayOfWeek,
+          slot,
+          blockType: source.blockType,
+          title: source.title,
+          description: source.description,
+        });
+        setSupaBlocks((prev) => withBlockInSlot(prev, weekKey, saved));
+        return saved.id;
+      }
+
+      const current = loadFromStorage();
+      const existing = current.blocks.find(
+        (b) =>
+          b.weekPlanId === weekKey &&
+          b.dayOfWeek === dayOfWeek &&
+          b.slot === slot,
+      );
+      if (existing) return existing.id;
+      const created = createBlock({
+        id: crypto.randomUUID(),
+        weekPlanId: weekKey,
+        dayOfWeek,
+        slot,
+        blockType: source.blockType,
+        title: source.title,
+        description: source.description,
+        status: BlockStatus.Planned,
+      });
+      current.blocks.push(created);
+      saveToStorage(current);
+      return created.id;
+    },
+    [user, rhythmSlotAt],
   );
 
   const saveBlock = useCallback(
@@ -566,6 +695,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
               title,
               description,
               blockType,
+              suppressed: false,
             });
             resultBlock = updated;
             return {
@@ -624,6 +754,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             title,
             description,
             blockType,
+            suppressed: false,
           });
           current.blocks = current.blocks.map((b) =>
             b.id === existing.id ? resultBlock : b,
@@ -645,6 +776,48 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const updateStatus = useCallback(
     (blockId: string, status: BlockStatus) => {
+      const projected = parseRhythmBlockId(blockId);
+      if (projected) {
+        // Checking off a cell the rhythm supplied is the first time it needs a
+        // row of its own — create it already carrying the new status.
+        const { weekKey, dayOfWeek, slot } = projected;
+        const source = rhythmSlotAt(weekKey, dayOfWeek, slot);
+        if (!source) return;
+        if (user) {
+          materializeBlock(user.id, weekKey, {
+            dayOfWeek,
+            slot,
+            blockType: source.blockType,
+            title: source.title,
+            description: source.description,
+            status,
+          })
+            .then((saved) => {
+              setSupaBlocks((prev) => withBlockInSlot(prev, weekKey, saved));
+            })
+            .catch((err) => {
+              console.error(err);
+              notify.error("狀態更新失敗");
+            });
+          return;
+        }
+        const current = loadFromStorage();
+        current.blocks.push(
+          createBlock({
+            id: crypto.randomUUID(),
+            weekPlanId: weekKey,
+            dayOfWeek,
+            slot,
+            blockType: source.blockType,
+            title: source.title,
+            description: source.description,
+            status,
+          }),
+        );
+        saveToStorage(current);
+        return;
+      }
+
       if (user) {
         setSupaBlocks((prev) => {
           const out: Record<string, Block[]> = {};
@@ -667,7 +840,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveToStorage(current);
       }
     },
-    [user, notify, useCases],
+    [user, notify, useCases, rhythmSlotAt],
   );
 
   const copyRecentWeekPlan = useCallback(
@@ -835,7 +1008,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const swapBlocks = useCallback(
-    async (idA: string, idB: string) => {
+    async (rawIdA: string, rawIdB: string) => {
+      const idA = await ensureRealBlock(rawIdA);
+      const idB = await ensureRealBlock(rawIdB);
+      if (!idA || !idB) return;
       setSupaBlocks((prev) => {
         const flat = Object.values(prev).flat();
         const a = flat.find((b) => b.id === idA);
@@ -872,11 +1048,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [user, notify],
+    [user, notify, ensureRealBlock],
   );
 
   const moveBlock = useCallback(
-    async (id: string, dayOfWeek: number, slot: number) => {
+    async (rawId: string, dayOfWeek: number, slot: number) => {
+      const id = await ensureRealBlock(rawId);
+      if (!id) return;
       setSupaBlocks((prev) => {
         const out: Record<string, Block[]> = {};
         for (const [wk, list] of Object.entries(prev)) {
@@ -895,7 +1073,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [user, notify],
+    [user, notify, ensureRealBlock],
   );
 
   const saveDiary = useCallback(
@@ -956,8 +1134,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addSubtask = useCallback(
-    (blockId: string, title: string) => {
+    async (rawBlockId: string, title: string) => {
       if (!user) return;
+      const blockId = await ensureRealBlock(rawBlockId);
+      if (!blockId) return;
       const existing = subtasks.filter((s) => s.blockId === blockId);
       const position =
         existing.length === 0
@@ -970,7 +1150,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           notify.error("細項新增失敗");
         });
     },
-    [user, subtasks, notify],
+    [user, subtasks, notify, ensureRealBlock],
   );
 
   const editSubtask = useCallback(
@@ -1223,7 +1403,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const linkBlockToKeyResult = useCallback(
-    (blockId: string, keyResultId: string | null) => {
+    async (rawBlockId: string, keyResultId: string | null) => {
+      const blockId = await ensureRealBlock(rawBlockId);
+      if (!blockId) return;
       setSupaBlocks((prev) => {
         const out: Record<string, Block[]> = {};
         for (const [wk, list] of Object.entries(prev)) {
@@ -1240,7 +1422,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           notify.error("區塊歸屬 KR 失敗");
         });
     },
-    [useCases, notify],
+    [useCases, notify, ensureRealBlock],
   );
 
   const linkWeeklyTaskToKeyResult = useCallback(
@@ -1277,7 +1459,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, [user, useCases]);
 
   const linkBlockToProject = useCallback(
-    (blockId: string, projectId: string | null) => {
+    async (rawBlockId: string, projectId: string | null) => {
+      const blockId = await ensureRealBlock(rawBlockId);
+      if (!blockId) return;
       setSupaBlocks((prev) => {
         const out: Record<string, Block[]> = {};
         for (const [wk, list] of Object.entries(prev)) {
@@ -1292,7 +1476,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         notify.error("區塊歸屬專案失敗");
       });
     },
-    [useCases, notify],
+    [useCases, notify, ensureRealBlock],
   );
 
   const loadProjectSteps = useCallback(
@@ -1375,8 +1559,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const startTimer = useCallback(
-    async (blockId: string) => {
+    async (rawBlockId: string) => {
       if (!user) return;
+      const blockId = await ensureRealBlock(rawBlockId);
+      if (!blockId) return;
       try {
         if (activeTimer) {
           const nowDate = new Date();
@@ -1402,7 +1588,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         notify.error("計時器啟動失敗");
       }
     },
-    [user, activeTimer, notify],
+    [user, activeTimer, notify, ensureRealBlock],
   );
 
   const stopTimer = useCallback(async () => {
@@ -1428,8 +1614,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, [user, activeTimer, notify]);
 
   const addManualTimer = useCallback(
-    async (blockId: string, startedAt: Date, endedAt: Date) => {
+    async (rawBlockId: string, startedAt: Date, endedAt: Date) => {
       if (!user) return;
+      const blockId = await ensureRealBlock(rawBlockId);
+      if (!blockId) return;
       try {
         const created = await dbAddManualSession(
           user.id,
@@ -1443,7 +1631,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         notify.error("手動新增時段失敗");
       }
     },
-    [user, notify],
+    [user, notify, ensureRealBlock],
   );
 
   const clearTimer = useCallback(
