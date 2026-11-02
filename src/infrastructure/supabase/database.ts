@@ -16,6 +16,8 @@ import type { WeekPlan } from "@/domain/entities/week-plan";
 import type { Rhythm } from "@/domain/entities/rhythm";
 import { createRhythm } from "@/domain/entities/rhythm";
 import { createRhythmSlot } from "@/domain/entities/rhythm-slot";
+import type { Direction } from "@/domain/entities/direction";
+import { createDirection } from "@/domain/entities/direction";
 import { parseDateKey, formatDateKey } from "@/lib/date-helpers";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
@@ -1174,4 +1176,110 @@ export async function insertPlanChange(
     .single();
   if (error) throw new Error(error.message);
   return dbPlanChangeToEntity(data as DbPlanChange);
+}
+
+// --- Directions ---
+
+interface DbDirection {
+  id: string;
+  user_id: string;
+  position: number;
+  text: string;
+  direction_titles: { title: string }[];
+}
+
+export async function fetchDirections(userId: string): Promise<Direction[]> {
+  const { data, error } = await supabase
+    .from("directions")
+    .select("id, user_id, position, text, direction_titles(title)")
+    .eq("user_id", userId)
+    .order("position");
+  if (error) throw new Error(error.message);
+  return (data as DbDirection[]).map((d) =>
+    createDirection({
+      id: d.id,
+      userId: d.user_id,
+      position: d.position,
+      text: d.text,
+      titles: d.direction_titles.map((t) => t.title),
+    }),
+  );
+}
+
+/** Replace a user's directions atomically — see `replace_directions` in 016. */
+export async function replaceDirectionRows(
+  directions: readonly Direction[],
+): Promise<void> {
+  const { error } = await supabase.rpc("replace_directions", {
+    p_directions: directions.map((d) => ({
+      id: d.id,
+      position: d.position,
+      text: d.text,
+      titles: d.titles,
+    })),
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchWeekFocus(
+  userId: string,
+  weekKey: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("week_focus")
+    .select("direction_id")
+    .eq("user_id", userId)
+    .eq("week_start", weekKey)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as { direction_id: string } | null)?.direction_id ?? null;
+}
+
+export async function saveWeekFocus(
+  userId: string,
+  weekKey: string,
+  directionId: string | null,
+): Promise<void> {
+  const { error } = directionId
+    ? await supabase
+        .from("week_focus")
+        .upsert(
+          { user_id: userId, week_start: weekKey, direction_id: directionId },
+          { onConflict: "user_id,week_start" },
+        )
+    : await supabase
+        .from("week_focus")
+        .delete()
+        .eq("user_id", userId)
+        .eq("week_start", weekKey);
+  if (error) throw new Error(error.message);
+}
+
+// PostgREST caps a response (1000 rows by default), and a year of blocks
+// can pass that, so range reads go page by page.
+const PAGE_SIZE = 1000;
+
+/** Every stored block from one week to another, by week key. */
+export async function fetchBlocksBetween(
+  userId: string,
+  fromWeekKey: string,
+  toWeekKey: string,
+): Promise<Record<string, Block[]>> {
+  const byWeek: Record<string, Block[]> = {};
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("blocks")
+      .select("*, week_plans!inner(week_start, user_id)")
+      .eq("week_plans.user_id", userId)
+      .gte("week_plans.week_start", fromWeekKey)
+      .lte("week_plans.week_start", toWeekKey)
+      .order("id")
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = data as (DbBlock & { week_plans: { week_start: string } })[];
+    for (const row of rows) {
+      (byWeek[row.week_plans.week_start] ??= []).push(dbBlockToEntity(row));
+    }
+    if (rows.length < PAGE_SIZE) return byWeek;
+  }
 }

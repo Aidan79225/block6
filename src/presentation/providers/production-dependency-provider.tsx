@@ -7,6 +7,9 @@ import { SupabaseDiaryRepository } from "@/infrastructure/supabase/repositories/
 import { SupabaseWeekPlanRepository } from "@/infrastructure/supabase/repositories/supabase-week-plan-repository";
 import { SupabaseWeekReviewRepository } from "@/infrastructure/supabase/repositories/supabase-week-review-repository";
 import { SupabaseRhythmRepository } from "@/infrastructure/supabase/repositories/supabase-rhythm-repository";
+import { SupabaseDirectionRepository } from "@/infrastructure/supabase/repositories/supabase-direction-repository";
+import { SupabaseWeekFocusRepository } from "@/infrastructure/supabase/repositories/supabase-week-focus-repository";
+import { SupabaseWeekHistoryRepository } from "@/infrastructure/supabase/repositories/supabase-week-history-repository";
 
 export function ProductionDependencyProvider({
   children,
@@ -20,6 +23,9 @@ export function ProductionDependencyProvider({
       weekPlanRepo: new SupabaseWeekPlanRepository(),
       weekReviewRepo: new SupabaseWeekReviewRepository(),
       rhythmRepo: new SupabaseRhythmRepository(),
+      directionRepo: new SupabaseDirectionRepository(),
+      weekFocusRepo: new SupabaseWeekFocusRepository(),
+      weekHistoryRepo: new SupabaseWeekHistoryRepository(),
     }),
     [],
   );

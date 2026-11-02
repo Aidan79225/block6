@@ -16,6 +16,18 @@ import { GetWeekSummaryUseCase } from "@/domain/usecases/get-week-summary";
 import { RhythmRepository } from "@/domain/repositories/rhythm-repository";
 import { SetRhythmUseCase } from "@/domain/usecases/set-rhythm";
 import { ListRhythmHistoryUseCase } from "@/domain/usecases/list-rhythm-history";
+import { DirectionRepository } from "@/domain/repositories/direction-repository";
+import { WeekFocusRepository } from "@/domain/repositories/week-focus-repository";
+import { WeekHistoryRepository } from "@/domain/repositories/week-history-repository";
+import {
+  ListDirectionsUseCase,
+  SetDirectionsUseCase,
+} from "@/domain/usecases/set-directions";
+import { GetDirectionTrajectoryUseCase } from "@/domain/usecases/get-direction-trajectory";
+import {
+  GetWeekFocusUseCase,
+  SetWeekFocusUseCase,
+} from "@/domain/usecases/week-focus";
 
 export interface UseCases {
   createWeekPlan: CreateWeekPlanUseCase;
@@ -28,6 +40,11 @@ export interface UseCases {
   getWeekSummary: GetWeekSummaryUseCase;
   setRhythm: SetRhythmUseCase;
   listRhythmHistory: ListRhythmHistoryUseCase;
+  listDirections: ListDirectionsUseCase;
+  setDirections: SetDirectionsUseCase;
+  getDirectionTrajectory: GetDirectionTrajectoryUseCase;
+  getWeekFocus: GetWeekFocusUseCase;
+  setWeekFocus: SetWeekFocusUseCase;
 }
 
 interface Repositories {
@@ -36,6 +53,9 @@ interface Repositories {
   diaryRepo: DiaryRepository;
   weekReviewRepo: WeekReviewRepository;
   rhythmRepo: RhythmRepository;
+  directionRepo: DirectionRepository;
+  weekFocusRepo: WeekFocusRepository;
+  weekHistoryRepo: WeekHistoryRepository;
 }
 
 const UseCaseContext = createContext<UseCases | null>(null);
@@ -61,6 +81,15 @@ export function DependencyProvider({
       getWeekSummary: new GetWeekSummaryUseCase(repositories.blockRepo),
       setRhythm: new SetRhythmUseCase(repositories.rhythmRepo),
       listRhythmHistory: new ListRhythmHistoryUseCase(repositories.rhythmRepo),
+      listDirections: new ListDirectionsUseCase(repositories.directionRepo),
+      setDirections: new SetDirectionsUseCase(repositories.directionRepo),
+      getDirectionTrajectory: new GetDirectionTrajectoryUseCase(
+        repositories.weekHistoryRepo,
+        repositories.rhythmRepo,
+        repositories.directionRepo,
+      ),
+      getWeekFocus: new GetWeekFocusUseCase(repositories.weekFocusRepo),
+      setWeekFocus: new SetWeekFocusUseCase(repositories.weekFocusRepo),
     }),
     [repositories],
   );
