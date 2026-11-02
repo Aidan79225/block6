@@ -237,6 +237,11 @@ export async function insertBlocks(
   return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
 }
 
+export async function deleteBlock(id: string): Promise<void> {
+  const { error } = await supabase.from("blocks").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function upsertBlock(
   userId: string,
   weekStart: string,

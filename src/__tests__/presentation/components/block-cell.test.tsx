@@ -17,6 +17,7 @@ function makeBlock(overrides: Partial<Block> = {}): Block {
     status: BlockStatus.Planned,
     keyResultId: null,
     projectId: null,
+    suppressed: false,
     ...overrides,
   };
 }
@@ -37,6 +38,7 @@ describe("BlockCell", () => {
             status: BlockStatus.Planned,
             keyResultId: null,
             projectId: null,
+            suppressed: false,
           }}
           dayOfWeek={1}
           slot={1}
@@ -90,6 +92,7 @@ describe("BlockCell", () => {
             status: BlockStatus.Completed,
             keyResultId: null,
             projectId: null,
+            suppressed: false,
           }}
           dayOfWeek={1}
           slot={1}

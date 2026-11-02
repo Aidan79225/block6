@@ -1,4 +1,4 @@
-export type PlanChangeAction = "edit" | "move" | "add";
+export type PlanChangeAction = "edit" | "move" | "add" | "delete";
 
 export interface PlanChange {
   readonly id: string;

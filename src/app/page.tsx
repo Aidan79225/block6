@@ -90,6 +90,7 @@ export default function DashboardPage() {
     loadWeeklyCompletions,
     copyRecentWeekPlan,
     applyWeekTemplate,
+    deleteBlock,
     addPlanChange,
     loadPlanChanges,
     keyResultOptions,
@@ -138,6 +139,13 @@ export default function DashboardPage() {
         logDayOfWeek: number;
         logSlot: number;
         titleSnapshot: string;
+      }
+    | {
+        kind: "delete";
+        blockId: string;
+        dayOfWeek: number;
+        slot: number;
+        titleSnapshot: string;
       };
 
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(
@@ -154,6 +162,9 @@ export default function DashboardPage() {
     }
     if (pendingChange.kind === "move") {
       return `Move: "${pendingChange.titleSnapshot}" → day ${pendingChange.dayOfWeek} slot ${pendingChange.slot}`;
+    }
+    if (pendingChange.kind === "delete") {
+      return `Delete: "${pendingChange.titleSnapshot}"`;
     }
     return `Swap: "${pendingChange.titleSnapshot}"`;
   })();
@@ -183,6 +194,19 @@ export default function DashboardPage() {
         slot: pending.slot,
         blockTitleSnapshot: pending.title,
         action: pending.action,
+        reason,
+      });
+      return;
+    }
+
+    if (pending.kind === "delete") {
+      if (!(await removeBlock(pending.blockId))) return;
+      await addPlanChange({
+        weekKey,
+        dayOfWeek: pending.dayOfWeek,
+        slot: pending.slot,
+        blockTitleSnapshot: pending.titleSnapshot,
+        action: "delete",
         reason,
       });
       return;
@@ -345,6 +369,36 @@ export default function DashboardPage() {
     );
   };
 
+  /** Delete a block; false when it failed and the provider rolled it back. */
+  const removeBlock = async (blockId: string): Promise<boolean> => {
+    try {
+      await deleteBlock(blockId);
+      return true;
+    } catch {
+      // The provider already surfaced the failure and rolled the block back.
+      return false;
+    }
+  };
+
+  const handleDeleteBlock = async () => {
+    if (!selectedBlock) return;
+    const block = selectedBlock;
+    // Removing a block from today is a change of plan like editing or moving
+    // one, so it asks for a reason and is logged the same way.
+    if (isLockedDay(getCellDate(weekStart, block.dayOfWeek), new Date())) {
+      setPendingChange({
+        kind: "delete",
+        blockId: block.id,
+        dayOfWeek: block.dayOfWeek,
+        slot: block.slot,
+        titleSnapshot: block.title,
+      });
+      return;
+    }
+    setSelection(null);
+    await removeBlock(block.id);
+  };
+
   const handleBlockClick = (dayOfWeek: number, slot: number) => {
     const block = blocks.find(
       (b) => b.dayOfWeek === dayOfWeek && b.slot === slot,
@@ -371,7 +425,11 @@ export default function DashboardPage() {
     if (day == null || slot == null) return;
 
     const locked = isLockedDay(getCellDate(weekStart, day), new Date());
-    if (locked) {
+    const isAdd = selection.kind === "empty";
+
+    // Filling a slot that was empty is not a change of plan — only reworking a
+    // block that already existed is worth interrupting the user for.
+    if (locked && !isAdd) {
       setPendingChange({
         kind: "save",
         dayOfWeek: day,
@@ -379,14 +437,24 @@ export default function DashboardPage() {
         title,
         description,
         blockType,
-        action: selection.kind === "empty" ? "add" : "edit",
+        action: "edit",
       });
       return;
     }
 
     const saved = saveBlock(weekKey, day, slot, title, description, blockType);
-    if (selection.kind === "empty") {
+    if (isAdd) {
       setSelection({ kind: "block", blockId: saved.id });
+    }
+    if (locked && isAdd) {
+      void addPlanChange({
+        weekKey,
+        dayOfWeek: day,
+        slot,
+        blockTitleSnapshot: title,
+        action: "add",
+        reason: "",
+      });
     }
   };
 
@@ -641,6 +709,7 @@ export default function DashboardPage() {
               if (selectedBlock) clearTimer(selectedBlock.id);
             }}
             onClose={() => setSelection(null)}
+            onDeleteBlock={handleDeleteBlock}
             keyResultOptions={keyResultOptions}
             onLinkBlockKeyResult={(keyResultId) => {
               if (selectedBlock)
