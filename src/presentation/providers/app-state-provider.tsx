@@ -81,8 +81,10 @@ import {
   rhythmSlotsForWeek,
 } from "@/domain/entities/rhythm";
 import {
+  regrettedRhythmSlots,
   rhythmSlotsFromWeek,
   rhythmStartAfter,
+  rhythmWithout,
 } from "@/domain/usecases/set-rhythm";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
 import { parseDateKey } from "@/lib/date-helpers";
@@ -112,6 +114,15 @@ interface AppState {
   rhythmSlots: readonly RhythmSlot[];
   setRhythmFromWeek: (weekKey: string) => Promise<number>;
   clearRhythm: () => Promise<void>;
+  /** Mark a block in review as not worth it (or take the mark back). */
+  setBlockRegretted: (blockId: string, regretted: boolean) => Promise<void>;
+  /**
+   * Slots of the given week's regretted blocks that the newest rhythm would
+   * still bring back every week.
+   */
+  regrettedRhythmSlotsForWeek: (weekKey: string) => SlotPosition[];
+  /** Drop slots from the rhythm, from next week on. */
+  removeSlotsFromRhythm: (slots: readonly SlotPosition[]) => Promise<void>;
   deleteBlock: (blockId: string) => Promise<void>;
   planChanges: Record<string, PlanChange[]>;
   loadPlanChanges: (weekKey: string) => Promise<void>;
@@ -387,6 +398,21 @@ function withBlockInSlot(
     (b) => !(b.dayOfWeek === block.dayOfWeek && b.slot === block.slot),
   );
   return { ...byWeek, [weekKey]: [...others, block] };
+}
+
+/** `byWeek` with one block, wherever it is, changed by `change`. */
+function withBlockChanged(
+  byWeek: Record<string, Block[]>,
+  blockId: string,
+  change: Partial<Block>,
+): Record<string, Block[]> {
+  const out: Record<string, Block[]> = {};
+  for (const [wk, list] of Object.entries(byWeek)) {
+    out[wk] = list.map((b) =>
+      b.id === blockId ? createBlock({ ...b, ...change }) : b,
+    );
+  }
+  return out;
 }
 
 function locateBlock(
@@ -956,15 +982,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (user) {
-        setSupaBlocks((prev) => {
-          const out: Record<string, Block[]> = {};
-          for (const [wk, list] of Object.entries(prev)) {
-            out[wk] = list.map((b) =>
-              b.id === blockId ? createBlock({ ...b, status }) : b,
-            );
-          }
-          return out;
-        });
+        setSupaBlocks((prev) => withBlockChanged(prev, blockId, { status }));
         useCases.updateBlockStatus.execute(blockId, status).catch((err) => {
           console.error(err);
           notify.error("狀態更新失敗");
@@ -996,10 +1014,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (!sourceWeekKey) return { copied: 0, sourceWeekKey: null };
 
       try {
-        // Suppressed rows are deliberately empty slots, not plans to copy.
+        // Suppressed rows are deliberately empty slots, and regretted blocks
+        // were judged not worth it in review — neither is a plan to copy.
         const prevBlocks = (
           await fetchBlocksForWeek(user.id, sourceWeekKey)
-        ).filter((b) => !b.suppressed);
+        ).filter((b) => !b.suppressed && !b.regretted);
         if (prevBlocks.length === 0) {
           return { copied: 0, sourceWeekKey: null };
         }
@@ -1164,6 +1183,45 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const clearRhythm = useCallback(
     () => adoptRhythmSlots([]),
     [adoptRhythmSlots],
+  );
+
+  const regrettedRhythmSlotsForWeek = useCallback(
+    (weekKey: string): SlotPosition[] =>
+      regrettedRhythmSlots(getBlocksForWeek(weekKey), rhythmSlots),
+    [getBlocksForWeek, rhythmSlots],
+  );
+
+  const removeSlotsFromRhythm = useCallback(
+    (slots: readonly SlotPosition[]) =>
+      adoptRhythmSlots(rhythmWithout(rhythmSlots, slots)),
+    [adoptRhythmSlots, rhythmSlots],
+  );
+
+  const setBlockRegretted = useCallback(
+    async (rawBlockId: string, regretted: boolean): Promise<void> => {
+      // A rhythm cell nobody wrote to has no row to carry the mark yet.
+      const blockId = await ensureRealBlock(rawBlockId);
+      if (!blockId) return;
+      if (user) {
+        setSupaBlocks((prev) => withBlockChanged(prev, blockId, { regretted }));
+        try {
+          await useCases.setBlockRegretted.execute(blockId, regretted);
+        } catch (err) {
+          console.error(err);
+          notify.error("標記失敗");
+          setSupaBlocks((prev) =>
+            withBlockChanged(prev, blockId, { regretted: !regretted }),
+          );
+        }
+        return;
+      }
+      const current = loadFromStorage();
+      current.blocks = current.blocks.map((b) =>
+        b.id === blockId ? createBlock({ ...b, regretted }) : b,
+      );
+      saveToStorage(current);
+    },
+    [user, notify, useCases, ensureRealBlock],
   );
 
   const deleteBlock = useCallback(
@@ -1723,15 +1781,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     async (rawBlockId: string, keyResultId: string | null) => {
       const blockId = await ensureRealBlock(rawBlockId);
       if (!blockId) return;
-      setSupaBlocks((prev) => {
-        const out: Record<string, Block[]> = {};
-        for (const [wk, list] of Object.entries(prev)) {
-          out[wk] = list.map((b) =>
-            b.id === blockId ? createBlock({ ...b, keyResultId }) : b,
-          );
-        }
-        return out;
-      });
+      setSupaBlocks((prev) => withBlockChanged(prev, blockId, { keyResultId }));
       useCases.linkBlockToKeyResult
         .execute(blockId, keyResultId)
         .catch((err) => {
@@ -1779,15 +1829,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     async (rawBlockId: string, projectId: string | null) => {
       const blockId = await ensureRealBlock(rawBlockId);
       if (!blockId) return;
-      setSupaBlocks((prev) => {
-        const out: Record<string, Block[]> = {};
-        for (const [wk, list] of Object.entries(prev)) {
-          out[wk] = list.map((b) =>
-            b.id === blockId ? createBlock({ ...b, projectId }) : b,
-          );
-        }
-        return out;
-      });
+      setSupaBlocks((prev) => withBlockChanged(prev, blockId, { projectId }));
       useCases.linkBlockToProject.execute(blockId, projectId).catch((err) => {
         console.error(err);
         notify.error("區塊歸屬專案失敗");
@@ -1980,6 +2022,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         rhythmSlots,
         setRhythmFromWeek,
         clearRhythm,
+        setBlockRegretted,
+        regrettedRhythmSlotsForWeek,
+        removeSlotsFromRhythm,
         deleteBlock,
         planChanges,
         loadPlanChanges,
