@@ -178,6 +178,14 @@ function migrateDiaryEntries(
   return result;
 }
 
+// `storage` only fires in *other* tabs, so same-tab writes have to notify
+// subscribers explicitly or the UI silently keeps rendering stale data.
+const storageListeners = new Set<() => void>();
+
+function notifyStorageListeners(): void {
+  for (const listener of storageListeners) listener();
+}
+
 function loadFromStorage(): PersistedData {
   if (typeof window === "undefined") return EMPTY_DATA;
   try {
@@ -203,6 +211,7 @@ function saveToStorage(data: PersistedData): void {
     localStorage.setItem(STORAGE_KEY, json);
     cachedRaw = json;
     cachedData = data;
+    notifyStorageListeners();
   } catch {
     // Storage full or unavailable
   }
@@ -213,6 +222,7 @@ function clearStorage(): void {
     localStorage.removeItem(STORAGE_KEY);
     cachedRaw = null;
     cachedData = EMPTY_DATA;
+    notifyStorageListeners();
   } catch {
     // Ignore
   }
@@ -280,11 +290,15 @@ async function migrateLocalToSupabase(
 // --- Read localStorage as external store (SSR-safe) ---
 
 function subscribeToStorage(callback: () => void): () => void {
+  storageListeners.add(callback);
   const handler = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) callback();
   };
   window.addEventListener("storage", handler);
-  return () => window.removeEventListener("storage", handler);
+  return () => {
+    storageListeners.delete(callback);
+    window.removeEventListener("storage", handler);
+  };
 }
 
 let cachedRaw: string | null = null;

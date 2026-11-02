@@ -334,6 +334,17 @@ export default function DashboardPage() {
     }
   };
 
+  const handleToggleComplete = (blockId: string) => {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block) return;
+    updateStatus(
+      blockId,
+      block.status === BlockStatus.Completed
+        ? BlockStatus.Planned
+        : BlockStatus.Completed,
+    );
+  };
+
   const handleBlockClick = (dayOfWeek: number, slot: number) => {
     const block = blocks.find(
       (b) => b.dayOfWeek === dayOfWeek && b.slot === slot,
@@ -468,6 +479,7 @@ export default function DashboardPage() {
               onBlockClick={handleBlockClick}
               onSwapBlocks={handleSwapBlocks}
               onMoveBlock={handleMoveBlock}
+              onToggleComplete={handleToggleComplete}
             />
           </div>
           <div className="mobile-only">
@@ -484,6 +496,7 @@ export default function DashboardPage() {
                 onNextDay={
                   mobileDay < 7 ? () => setMobileDay((d) => d + 1) : undefined
                 }
+                onToggleComplete={handleToggleComplete}
               />
             )}
             {mobileView === "overview" && (
