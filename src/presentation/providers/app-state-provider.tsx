@@ -51,6 +51,7 @@ import {
   fetchPlanChangesForWeek,
   insertPlanChange,
   dbSetWeeklyTaskKeyResult,
+  findMostRecentWeekWithBlocks,
   insertBlocks,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
@@ -60,7 +61,7 @@ import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import { buildWeekTemplate } from "@/domain/usecases/build-week-template";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
-import { formatDateKey, parseDateKey } from "@/lib/date-helpers";
+import { parseDateKey } from "@/lib/date-helpers";
 
 interface AppState {
   getBlocksForWeek: (weekKey: string) => Block[];
@@ -73,7 +74,9 @@ interface AppState {
     blockType: BlockType,
   ) => Block;
   updateStatus: (blockId: string, status: BlockStatus) => void;
-  copyPreviousWeekPlan: (currentWeekKey: string) => Promise<number>;
+  copyRecentWeekPlan: (
+    currentWeekKey: string,
+  ) => Promise<{ copied: number; sourceWeekKey: string | null }>;
   applyWeekTemplate: (weekKey: string) => Promise<number>;
   planChanges: Record<string, PlanChange[]>;
   loadPlanChanges: (weekKey: string) => Promise<void>;
@@ -304,6 +307,10 @@ function getServerSnapshot(): PersistedData {
 // --- Provider ---
 
 const AppStateContext = createContext<AppState | null>(null);
+
+// How far back to look for a week worth copying. Long enough to survive a
+// month-long break, short enough that the search stays cheap.
+const MAX_WEEKS_BACK_FOR_COPY = 8;
 
 const PLAN_CHANGES_STORAGE_KEY = (userIdOrAnon: string) =>
   `block6:planChanges:${userIdOrAnon}`;
@@ -632,18 +639,26 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, notify, useCases],
   );
 
-  const copyPreviousWeekPlan = useCallback(
-    async (currentWeekKey: string): Promise<number> => {
-      if (!user) return 0;
+  const copyRecentWeekPlan = useCallback(
+    async (
+      currentWeekKey: string,
+    ): Promise<{ copied: number; sourceWeekKey: string | null }> => {
+      if (!user) return { copied: 0, sourceWeekKey: null };
 
-      const currentDate = new Date(currentWeekKey);
-      const prev = new Date(currentDate);
-      prev.setDate(prev.getDate() - 7);
-      const previousWeekKey = formatDateKey(prev);
+      // Look past the immediately previous week: after a break, that one is
+      // usually empty and the last plan the user actually wrote is further back.
+      const sourceWeekKey = await findMostRecentWeekWithBlocks(
+        user.id,
+        currentWeekKey,
+        MAX_WEEKS_BACK_FOR_COPY,
+      );
+      if (!sourceWeekKey) return { copied: 0, sourceWeekKey: null };
 
       try {
-        const prevBlocks = await fetchBlocksForWeek(user.id, previousWeekKey);
-        if (prevBlocks.length === 0) return 0;
+        const prevBlocks = await fetchBlocksForWeek(user.id, sourceWeekKey);
+        if (prevBlocks.length === 0) {
+          return { copied: 0, sourceWeekKey: null };
+        }
 
         const prevSubtasks = await fetchSubtasksForBlocks(
           prevBlocks.map((b) => b.id),
@@ -694,7 +709,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           inserted++;
         }
 
-        return inserted;
+        return { copied: inserted, sourceWeekKey };
       } finally {
         loadedWeeks.current.delete(currentWeekKey);
         loadWeek(currentWeekKey);
@@ -1384,7 +1399,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         getBlocksForWeek,
         saveBlock,
         updateStatus,
-        copyPreviousWeekPlan,
+        copyRecentWeekPlan,
         applyWeekTemplate,
         planChanges,
         loadPlanChanges,

@@ -166,6 +166,44 @@ export async function fetchBlocksForWeek(
 }
 
 /**
+ * The most recent week at or before `beforeWeekStart` that actually holds
+ * blocks, searched back at most `maxWeeksBack` weeks. Returns null when the
+ * user has no populated week in that range.
+ */
+export async function findMostRecentWeekWithBlocks(
+  userId: string,
+  beforeWeekStart: string,
+  maxWeeksBack: number,
+): Promise<string | null> {
+  const { data: plans, error } = await supabase
+    .from("week_plans")
+    .select("id, week_start")
+    .eq("user_id", userId)
+    .lt("week_start", beforeWeekStart)
+    .order("week_start", { ascending: false })
+    .limit(maxWeeksBack);
+
+  if (error) throw new Error(error.message);
+  if (!plans || plans.length === 0) return null;
+
+  // Compare as date keys so the cutoff is timezone-independent.
+  const earliest = parseDateKey(beforeWeekStart);
+  earliest.setDate(earliest.getDate() - maxWeeksBack * 7);
+  const earliestKey = formatDateKey(earliest);
+
+  for (const plan of plans as { id: string; week_start: string }[]) {
+    if (plan.week_start < earliestKey) break;
+    const { count, error: countErr } = await supabase
+      .from("blocks")
+      .select("id", { count: "exact", head: true })
+      .eq("week_plan_id", plan.id);
+    if (countErr) throw new Error(countErr.message);
+    if ((count ?? 0) > 0) return plan.week_start;
+  }
+  return null;
+}
+
+/**
  * Insert several brand-new blocks in one round trip. Callers must only pass
  * slots that are still free — the unique(week_plan_id, day_of_week, slot)
  * constraint rejects the whole batch otherwise.
