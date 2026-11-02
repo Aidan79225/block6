@@ -18,6 +18,7 @@ import { WeekStartBanner } from "@/presentation/components/dashboard/week-start-
 import { FocusBanner } from "@/presentation/components/dashboard/focus-banner";
 import { WeeklyPromptBanner } from "@/presentation/components/dashboard/weekly-prompt-banner";
 import { useWeeklyPrompt } from "@/presentation/hooks/use-weekly-prompt";
+import { useRhythmSuggestion } from "@/presentation/hooks/use-rhythm-suggestion";
 import { useDirections } from "@/presentation/providers/direction-provider";
 import { weekTrajectory } from "@/domain/usecases/direction-trajectory";
 import { RhythmBar } from "@/presentation/components/dashboard/rhythm-bar";
@@ -286,6 +287,7 @@ export default function DashboardPage() {
   }, [weekKey, loadPlanChanges]);
 
   const weeklyPrompt = useWeeklyPrompt();
+  const rhythmSuggestion = useRhythmSuggestion();
 
   // What last week's review asked this week to pull back, if anything.
   const { directions, weekFocus, loadWeekFocus } = useDirections();
@@ -687,6 +689,18 @@ export default function DashboardPage() {
             isBusy={isSavingRhythm}
             onSetFromWeek={handleSetRhythmFromWeek}
             onClear={handleClearRhythm}
+            suggestionCount={rhythmSuggestion.slots.length}
+            onAcceptSuggestion={async () => {
+              const count = rhythmSuggestion.slots.length;
+              try {
+                await rhythmSuggestion.accept();
+                notify.info(`已加入常駐節奏（${count} 格），下週起每週自動帶入`);
+              } catch (err) {
+                console.error(err);
+                notify.error("加入常駐節奏失敗，請稍後再試");
+              }
+            }}
+            onDismissSuggestion={rhythmSuggestion.dismiss}
           />
           {blocks.length < 42 && (
             <WeekStartBanner

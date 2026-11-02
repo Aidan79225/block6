@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RhythmBar } from "@/presentation/components/dashboard/rhythm-bar";
@@ -80,5 +80,25 @@ describe("RhythmBar", () => {
     for (const button of screen.getAllByRole("button")) {
       expect(button).toBeDisabled();
     }
+  });
+
+  it("offers to add slots that stayed the same for weeks", async () => {
+    const user = userEvent.setup();
+    const onAcceptSuggestion = vi.fn();
+    const onDismissSuggestion = vi.fn();
+    renderBar({ suggestionCount: 10, onAcceptSuggestion, onDismissSuggestion });
+
+    expect(
+      screen.getByText("最近 3 週有 10 格每週都一樣 — 設成常駐節奏？"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "加入節奏" }));
+    await user.click(screen.getByRole("button", { name: "不用" }));
+    expect(onAcceptSuggestion).toHaveBeenCalledOnce();
+    expect(onDismissSuggestion).toHaveBeenCalledOnce();
+  });
+
+  it("says nothing when there is nothing to suggest", () => {
+    renderBar();
+    expect(screen.queryByRole("button", { name: "加入節奏" })).toBeNull();
   });
 });
