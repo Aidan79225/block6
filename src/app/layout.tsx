@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/presentation/providers/auth-provider";
 import { AppStateProvider } from "@/presentation/providers/app-state-provider";
+import { DirectionProvider } from "@/presentation/providers/direction-provider";
 import { NotificationProvider } from "@/presentation/providers/notification-provider";
 import { ProductionDependencyProvider } from "@/presentation/providers/production-dependency-provider";
 import "./globals.css";
@@ -21,7 +22,9 @@ export default function RootLayout({
         <NotificationProvider>
           <AuthProvider>
             <ProductionDependencyProvider>
-              <AppStateProvider>{children}</AppStateProvider>
+              <AppStateProvider>
+                <DirectionProvider>{children}</DirectionProvider>
+              </AppStateProvider>
             </ProductionDependencyProvider>
           </AuthProvider>
         </NotificationProvider>
