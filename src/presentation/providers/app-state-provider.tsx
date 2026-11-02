@@ -55,6 +55,8 @@ import {
   insertBlocks,
   deleteBlock as dbDeleteBlock,
   materializeBlock,
+  fetchRhythmHistory,
+  saveRhythmVersion,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
@@ -62,6 +64,7 @@ import type { ProjectStep } from "@/domain/entities/project-step";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
 import { buildWeekTemplate } from "@/domain/usecases/build-week-template";
+import { planBlockMove } from "@/domain/usecases/plan-block-move";
 import {
   projectRhythmOntoWeek,
   parseRhythmBlockId,
@@ -267,7 +270,8 @@ function hasLocalData(): boolean {
     return (
       (parsed.blocks?.length ?? 0) > 0 ||
       Object.keys(parsed.diaryEntries ?? {}).length > 0 ||
-      (parsed.reflection ?? "").length > 0
+      (parsed.reflection ?? "").length > 0 ||
+      (parsed.rhythms?.length ?? 0) > 0
     );
   } catch {
     return false;
@@ -293,17 +297,26 @@ async function migrateLocalToSupabase(
   userId: string,
   data: PersistedData,
 ): Promise<void> {
+  // An account that already has a rhythm keeps it: replacing a standing plan
+  // with one tried out while signed out is not something to do silently.
+  try {
+    const cloudRhythm = await fetchRhythmHistory(userId);
+    if (cloudRhythm.length === 0) {
+      const oldestFirst = [...data.rhythms].sort((a, b) =>
+        a.effectiveFrom.localeCompare(b.effectiveFrom),
+      );
+      for (const version of oldestFirst) {
+        await saveRhythmVersion({ ...version, userId });
+      }
+    }
+  } catch (err) {
+    console.error("[BLOCK6] Migration: failed to save rhythm:", err);
+  }
   for (const block of data.blocks) {
     try {
-      await upsertBlock(
-        userId,
-        block.weekPlanId,
-        block.dayOfWeek,
-        block.slot,
-        block.blockType,
-        block.title,
-        block.description,
-      );
+      // Status and suppression travel too: a checked-off block or a slot
+      // emptied against the rhythm must not come back as a plain plan.
+      await materializeBlock(userId, block.weekPlanId, block);
     } catch (err) {
       console.error("[BLOCK6] Migration: failed to save block:", err);
     }
@@ -377,6 +390,26 @@ function locateBlock(
     if (block) return { weekKey, block };
   }
   return null;
+}
+
+/** A fresh row marking a rhythm slot as deliberately empty this week. */
+function suppressedRhythmBlock(
+  weekKey: string,
+  dayOfWeek: number,
+  slot: number,
+  source: RhythmSlot,
+): Block {
+  return createBlock({
+    id: crypto.randomUUID(),
+    weekPlanId: weekKey,
+    dayOfWeek,
+    slot,
+    blockType: source.blockType,
+    title: source.title,
+    description: source.description,
+    status: BlockStatus.Planned,
+    suppressed: true,
+  });
 }
 
 const PLAN_CHANGES_STORAGE_KEY = (userIdOrAnon: string) =>
@@ -681,6 +714,31 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [user, rhythmSlotAt],
   );
 
+  /**
+   * Record a rhythm-covered slot as deliberately empty this week, so the
+   * rhythm does not refill it. Signed-in only; callers handle failures.
+   */
+  const suppressSlot = useCallback(
+    async (
+      weekKey: string,
+      dayOfWeek: number,
+      slot: number,
+      source: RhythmSlot,
+    ): Promise<void> => {
+      if (!user) return;
+      const saved = await materializeBlock(user.id, weekKey, {
+        dayOfWeek,
+        slot,
+        blockType: source.blockType,
+        title: source.title,
+        description: source.description,
+        suppressed: true,
+      });
+      setSupaBlocks((prev) => withBlockInSlot(prev, weekKey, saved));
+    },
+    [user],
+  );
+
   const saveBlock = useCallback(
     (
       weekKey: string,
@@ -876,7 +934,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (!sourceWeekKey) return { copied: 0, sourceWeekKey: null };
 
       try {
-        const prevBlocks = await fetchBlocksForWeek(user.id, sourceWeekKey);
+        // Suppressed rows are deliberately empty slots, not plans to copy.
+        const prevBlocks = (
+          await fetchBlocksForWeek(user.id, sourceWeekKey)
+        ).filter((b) => !b.suppressed);
         if (prevBlocks.length === 0) {
           return { copied: 0, sourceWeekKey: null };
         }
@@ -1045,13 +1106,59 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const deleteBlock = useCallback(
     async (blockId: string): Promise<void> => {
+      const parsed = parseRhythmBlockId(blockId);
+
+      // Clearing a slot the rhythm supplies cannot be a delete — there is no
+      // row to delete, and the rhythm would refill it. Record it as "this week
+      // this slot is deliberately empty" instead.
+      if (parsed) {
+        const { weekKey, dayOfWeek, slot } = parsed;
+        const source = rhythmSlotAt(weekKey, dayOfWeek, slot);
+        if (!source) return;
+        if (user) {
+          try {
+            await suppressSlot(weekKey, dayOfWeek, slot, source);
+          } catch (err) {
+            console.error(err);
+            notify.error("區塊刪除失敗");
+            throw err;
+          }
+          return;
+        }
+        const current = loadFromStorage();
+        current.blocks.push(
+          suppressedRhythmBlock(weekKey, dayOfWeek, slot, source),
+        );
+        saveToStorage(current);
+        return;
+      }
+
+      // A stored block is deleted outright, never just flagged: its status,
+      // subtasks and timer sessions belong to it, and would resurface if the
+      // slot were filled again. Where the rhythm covers the slot, a fresh
+      // suppressed row then keeps the rhythm from refilling it.
       if (user) {
         const previous = supaBlocksRef.current;
         const located = locateBlock(previous, blockId);
+        const source = located
+          ? rhythmSlotAt(
+              located.weekKey,
+              located.block.dayOfWeek,
+              located.block.slot,
+            )
+          : null;
         setSupaBlocks((prev) => {
           const out: Record<string, Block[]> = {};
           for (const [wk, list] of Object.entries(prev)) {
-            out[wk] = list.filter((b) => b.id !== blockId);
+            // Hidden at once, so the rhythm does not flash back into the
+            // slot while the suppressed row is being written.
+            out[wk] = list.flatMap((b) =>
+              b.id !== blockId
+                ? [b]
+                : source
+                  ? [createBlock({ ...b, suppressed: true })]
+                  : [],
+            );
           }
           return out;
         });
@@ -1060,6 +1167,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         setActiveTimer((prev) => (prev?.blockId === blockId ? null : prev));
         try {
           await dbDeleteBlock(blockId);
+          if (located && source) {
+            await suppressSlot(
+              located.weekKey,
+              located.block.dayOfWeek,
+              located.block.slot,
+              source,
+            );
+          }
         } catch (err) {
           console.error(err);
           notify.error("區塊刪除失敗");
@@ -1076,10 +1191,27 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }
 
       const current = loadFromStorage();
+      const stored = current.blocks.find((b) => b.id === blockId);
+      if (!stored) return;
       current.blocks = current.blocks.filter((b) => b.id !== blockId);
+      const source = rhythmSlotAt(
+        stored.weekPlanId,
+        stored.dayOfWeek,
+        stored.slot,
+      );
+      if (source) {
+        current.blocks.push(
+          suppressedRhythmBlock(
+            stored.weekPlanId,
+            stored.dayOfWeek,
+            stored.slot,
+            source,
+          ),
+        );
+      }
       saveToStorage(current);
     },
-    [user, notify, loadWeek],
+    [user, notify, loadWeek, rhythmSlotAt, suppressSlot],
   );
 
   const swapBlocks = useCallback(
@@ -1128,27 +1260,75 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const moveBlock = useCallback(
     async (rawId: string, dayOfWeek: number, slot: number) => {
+      // Read where the block sits before materializing it: a rhythm cell's
+      // position lives in its id, and state has not caught up with it yet.
+      const located = locateBlock(supaBlocksRef.current, rawId);
+      const origin =
+        parseRhythmBlockId(rawId) ??
+        (located && {
+          weekKey: located.weekKey,
+          dayOfWeek: located.block.dayOfWeek,
+          slot: located.block.slot,
+        });
       const id = await ensureRealBlock(rawId);
-      if (!id) return;
+      if (!id || !origin || !user) return;
+
+      const { weekKey } = origin;
+      const from = { dayOfWeek: origin.dayOfWeek, slot: origin.slot };
+      const { displacedSuppressedId: displacedId, vacatedRhythmSlot } =
+        planBlockMove({
+          overrides: supaBlocksRef.current[weekKey] ?? [],
+          rhythm: rhythmSlotsForWeek(rhythmHistoryRef.current, weekKey),
+          from,
+          to: { dayOfWeek, slot },
+        });
+
       setSupaBlocks((prev) => {
-        const out: Record<string, Block[]> = {};
-        for (const [wk, list] of Object.entries(prev)) {
-          out[wk] = list.map((block) =>
-            block.id === id ? createBlock({ ...block, dayOfWeek, slot }) : block,
+        const next = (prev[weekKey] ?? []).flatMap((b) => {
+          if (b.id === id) return [createBlock({ ...b, dayOfWeek, slot })];
+          if (b.id !== displacedId) return [b];
+          return vacatedRhythmSlot ? [createBlock({ ...b, ...from })] : [];
+        });
+        // Hold the vacated slot empty while its suppressed row is written,
+        // instead of letting the rhythm flash back into it.
+        if (vacatedRhythmSlot && !displacedId) {
+          next.push(
+            suppressedRhythmBlock(
+              weekKey,
+              from.dayOfWeek,
+              from.slot,
+              vacatedRhythmSlot,
+            ),
           );
         }
-        return out;
+        return { ...prev, [weekKey]: next };
       });
-      if (user) {
-        try {
+
+      try {
+        if (displacedId) {
+          // Trading places keeps the slot's unique row intact, and leaves the
+          // suppressed row in the vacated slot — kept only if it belongs there.
+          await swapBlocksInDb(id, displacedId);
+          if (!vacatedRhythmSlot) await dbDeleteBlock(displacedId);
+        } else {
           await moveBlockInDb(id, dayOfWeek, slot);
-        } catch (err) {
-          console.error(err);
-          notify.error("區塊移動失敗");
+          if (vacatedRhythmSlot) {
+            await suppressSlot(
+              weekKey,
+              from.dayOfWeek,
+              from.slot,
+              vacatedRhythmSlot,
+            );
+          }
         }
+      } catch (err) {
+        console.error(err);
+        notify.error("區塊移動失敗");
+        loadedWeeks.current.delete(weekKey);
+        loadWeek(weekKey);
       }
     },
-    [user, notify, ensureRealBlock],
+    [user, notify, ensureRealBlock, suppressSlot, loadWeek],
   );
 
   const saveDiary = useCallback(
