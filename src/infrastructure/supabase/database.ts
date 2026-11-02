@@ -165,6 +165,40 @@ export async function fetchBlocksForWeek(
   return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
 }
 
+/**
+ * Insert several brand-new blocks in one round trip. Callers must only pass
+ * slots that are still free — the unique(week_plan_id, day_of_week, slot)
+ * constraint rejects the whole batch otherwise.
+ */
+export async function insertBlocks(
+  userId: string,
+  weekStart: string,
+  rows: readonly {
+    dayOfWeek: number;
+    slot: number;
+    blockType: BlockType;
+  }[],
+): Promise<Block[]> {
+  if (rows.length === 0) return [];
+  const weekPlanId = await getOrCreateWeekPlan(userId, weekStart);
+  const { data, error } = await supabase
+    .from("blocks")
+    .insert(
+      rows.map((r) => ({
+        week_plan_id: weekPlanId,
+        day_of_week: r.dayOfWeek,
+        slot: r.slot,
+        block_type_id: BLOCK_TYPE_MAP[r.blockType],
+        title: "",
+        description: "",
+      })),
+    )
+    .select("*");
+
+  if (error) throw new Error(error.message);
+  return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
+}
+
 export async function upsertBlock(
   userId: string,
   weekStart: string,

@@ -51,12 +51,14 @@ import {
   fetchPlanChangesForWeek,
   insertPlanChange,
   dbSetWeeklyTaskKeyResult,
+  insertBlocks,
 } from "@/infrastructure/supabase/database";
 import type { DiaryLines } from "@/infrastructure/supabase/database";
 import type { KeyResultOption } from "@/domain/usecases/list-key-results-for-week";
 import type { ProjectStep } from "@/domain/entities/project-step";
 import type { PlanChange } from "@/domain/entities/plan-change";
 import { logPlanChange } from "@/domain/usecases/log-plan-change";
+import { buildWeekTemplate } from "@/domain/usecases/build-week-template";
 import type { LogPlanChangeInput } from "@/domain/usecases/log-plan-change";
 import { formatDateKey, parseDateKey } from "@/lib/date-helpers";
 
@@ -72,6 +74,7 @@ interface AppState {
   ) => Block;
   updateStatus: (blockId: string, status: BlockStatus) => void;
   copyPreviousWeekPlan: (currentWeekKey: string) => Promise<number>;
+  applyWeekTemplate: (weekKey: string) => Promise<number>;
   planChanges: Record<string, PlanChange[]>;
   loadPlanChanges: (weekKey: string) => Promise<void>;
   addPlanChange: (input: Omit<LogPlanChangeInput, "userId">) => Promise<void>;
@@ -696,6 +699,52 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         loadedWeeks.current.delete(currentWeekKey);
         loadWeek(currentWeekKey);
       }
+    },
+    [user, loadWeek],
+  );
+
+  /**
+   * Fill every still-empty slot of a week with the default BLOCK6 rhythm.
+   * The blocks land untitled — the point is to remove the "pick a type for all
+   * 42 cells" step, not to guess what the user will do.
+   */
+  const applyWeekTemplate = useCallback(
+    async (weekKey: string): Promise<number> => {
+      if (user) {
+        // The DB is the source of truth for what is occupied; local state can
+        // lag behind a copy or a save that is still in flight.
+        const existing = await fetchBlocksForWeek(user.id, weekKey);
+        const slots = buildWeekTemplate(existing);
+        if (slots.length === 0) return 0;
+        try {
+          await insertBlocks(user.id, weekKey, slots);
+          return slots.length;
+        } finally {
+          loadedWeeks.current.delete(weekKey);
+          loadWeek(weekKey);
+        }
+      }
+
+      const current = loadFromStorage();
+      const existing = current.blocks.filter((b) => b.weekPlanId === weekKey);
+      const slots = buildWeekTemplate(existing);
+      if (slots.length === 0) return 0;
+      for (const slot of slots) {
+        current.blocks.push(
+          createBlock({
+            id: crypto.randomUUID(),
+            weekPlanId: weekKey,
+            dayOfWeek: slot.dayOfWeek,
+            slot: slot.slot,
+            blockType: slot.blockType,
+            title: "",
+            description: "",
+            status: BlockStatus.Planned,
+          }),
+        );
+      }
+      saveToStorage(current);
+      return slots.length;
     },
     [user, loadWeek],
   );
@@ -1336,6 +1385,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         saveBlock,
         updateStatus,
         copyPreviousWeekPlan,
+        applyWeekTemplate,
         planChanges,
         loadPlanChanges,
         addPlanChange,
