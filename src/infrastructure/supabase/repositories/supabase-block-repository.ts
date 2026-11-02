@@ -5,6 +5,7 @@ import {
   fetchBlocksByWeekPlanId,
   insertBlockRow,
   updateBlockRow,
+  upsertBlockRows,
 } from "@/infrastructure/supabase/database";
 
 export class SupabaseBlockRepository implements BlockRepository {
@@ -22,5 +23,9 @@ export class SupabaseBlockRepository implements BlockRepository {
 
   async update(block: Block): Promise<void> {
     return updateBlockRow(block);
+  }
+
+  async saveAll(blocks: readonly Block[]): Promise<void> {
+    return upsertBlockRows(blocks);
   }
 }

@@ -5,4 +5,6 @@ export interface BlockRepository {
   findById(id: string): Promise<Block | null>;
   save(block: Block): Promise<void>;
   update(block: Block): Promise<void>;
+  /** Insert or update each block by id, all in one write. */
+  saveAll(blocks: readonly Block[]): Promise<void>;
 }

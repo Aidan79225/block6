@@ -451,8 +451,8 @@ export async function fetchBlocksByWeekPlanId(
   return (data ?? []).map((row) => dbBlockToEntity(row as DbBlock));
 }
 
-export async function insertBlockRow(block: Block): Promise<void> {
-  const { error } = await supabase.from("blocks").insert({
+function blockToRow(block: Block) {
+  return {
     id: block.id,
     week_plan_id: block.weekPlanId,
     day_of_week: block.dayOfWeek,
@@ -464,26 +464,26 @@ export async function insertBlockRow(block: Block): Promise<void> {
     key_result_id: block.keyResultId,
     project_id: block.projectId,
     suppressed: block.suppressed,
-  });
+  };
+}
+
+export async function insertBlockRow(block: Block): Promise<void> {
+  const { error } = await supabase.from("blocks").insert(blockToRow(block));
   if (error) throw new Error(error.message);
 }
 
 export async function updateBlockRow(block: Block): Promise<void> {
+  const { id, ...row } = blockToRow(block);
+  const { error } = await supabase.from("blocks").update(row).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/** Insert or update every block by id in one request. */
+export async function upsertBlockRows(blocks: readonly Block[]): Promise<void> {
+  if (blocks.length === 0) return;
   const { error } = await supabase
     .from("blocks")
-    .update({
-      week_plan_id: block.weekPlanId,
-      day_of_week: block.dayOfWeek,
-      slot: block.slot,
-      block_type_id: BLOCK_TYPE_MAP[block.blockType],
-      title: block.title,
-      description: block.description,
-      status: block.status,
-      key_result_id: block.keyResultId,
-      project_id: block.projectId,
-      suppressed: block.suppressed,
-    })
-    .eq("id", block.id);
+    .upsert(blocks.map(blockToRow), { onConflict: "id" });
   if (error) throw new Error(error.message);
 }
 
