@@ -39,14 +39,6 @@ interface SidePanelProps {
   onClearTimer: () => void;
   onClose: () => void;
   onDeleteBlock: () => void;
-  keyResultOptions: {
-    keyResultId: string;
-    title: string;
-    objectiveTitle: string;
-  }[];
-  onLinkBlockKeyResult: (keyResultId: string | null) => void;
-  projectOptions: { projectId: string; title: string }[];
-  onLinkBlockProject: (projectId: string | null) => void;
 }
 
 const DAY_LABELS = ["", "一", "二", "三", "四", "五", "六", "日"];
@@ -85,10 +77,6 @@ export function SidePanel({
   onClearTimer,
   onClose,
   onDeleteBlock,
-  keyResultOptions,
-  onLinkBlockKeyResult,
-  projectOptions,
-  onLinkBlockProject,
 }: SidePanelProps) {
   // Keyed by block id so switching blocks drops a pending confirmation
   // instead of carrying it over to the next one.
@@ -148,13 +136,6 @@ export function SidePanel({
         description={block?.description ?? ""}
         blockType={block?.blockType ?? BlockType.General}
         onSave={onSaveBlock}
-        blockId={block?.id ?? null}
-        keyResultId={block?.keyResultId ?? null}
-        keyResultOptions={keyResultOptions}
-        onLinkKeyResult={onLinkBlockKeyResult}
-        projectId={block?.projectId ?? null}
-        projectOptions={projectOptions}
-        onLinkProject={onLinkBlockProject}
       />
       {block && (
         <>
