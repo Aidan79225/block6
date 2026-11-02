@@ -5,6 +5,9 @@ import {
   formatDateKey,
   isSameLocalDay,
   parseDateKey,
+  addWeeks,
+  weekKeysFrom,
+  weekKeysOfYear,
 } from "@/lib/date-helpers";
 
 describe("date-helpers", () => {
@@ -112,6 +115,43 @@ describe("date-helpers", () => {
       for (const k of samples) {
         expect(formatDateKey(parseDateKey(k))).toBe(k);
       }
+    });
+  });
+
+  describe("addWeeks", () => {
+    it("moves a week key forward and back, across months and years", () => {
+      expect(addWeeks("2026-12-28", 1)).toBe("2027-01-04");
+      expect(addWeeks("2026-03-02", -1)).toBe("2026-02-23");
+      expect(addWeeks("2026-10-19", 0)).toBe("2026-10-19");
+    });
+  });
+
+  describe("weekKeysFrom", () => {
+    it("lists every week between two week keys, both included", () => {
+      expect(weekKeysFrom("2026-12-21", "2027-01-04")).toEqual([
+        "2026-12-21",
+        "2026-12-28",
+        "2027-01-04",
+      ]);
+    });
+
+    it("is empty when the range runs backwards", () => {
+      expect(weekKeysFrom("2026-10-19", "2026-10-12")).toEqual([]);
+    });
+  });
+
+  describe("weekKeysOfYear", () => {
+    it("lists the Mondays of the year, starting with the first one", () => {
+      const keys = weekKeysOfYear(2026);
+      expect(keys[0]).toBe("2026-01-05");
+      expect(keys.at(-1)).toBe("2026-12-28");
+      expect(keys).toHaveLength(52);
+    });
+
+    it("has 53 weeks when the year holds 53 Mondays", () => {
+      // 2024 started on a Monday and was a leap year.
+      expect(weekKeysOfYear(2024)).toHaveLength(53);
+      expect(weekKeysOfYear(2024)[0]).toBe("2024-01-01");
     });
   });
 });
