@@ -13,8 +13,8 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { BlockType } from "@/domain/entities/block";
 import { containsSlot, type SlotPosition } from "@/domain/usecases/slot-range";
+import { BLOCK_TYPE_COLOR } from "@/presentation/components/block-type-color";
 
 interface WeekGridProps {
   blocks: Block[];
@@ -34,13 +34,6 @@ interface WeekGridProps {
 
 const DAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
 const SLOTS = [1, 2, 3, 4, 5, 6];
-
-const typeColorMap: Record<BlockType, string> = {
-  [BlockType.Core]: "var(--color-block-core)",
-  [BlockType.Rest]: "var(--color-block-rest)",
-  [BlockType.Buffer]: "var(--color-block-buffer)",
-  [BlockType.General]: "var(--color-block-general)",
-};
 
 const headerStyle = {
   textAlign: "center",
@@ -183,7 +176,7 @@ export function WeekGrid({
           <div
             style={{
               background: "var(--color-bg-secondary)",
-              borderLeft: `3px solid ${typeColorMap[activeBlock.blockType]}`,
+              borderLeft: `3px solid ${BLOCK_TYPE_COLOR[activeBlock.blockType]}`,
               border: "1px solid var(--color-border)",
               borderRadius: "var(--radius-sm)",
               color: "var(--color-text-primary)",
