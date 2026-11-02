@@ -30,6 +30,9 @@ export class UpdateBlockUseCase {
         blockType: input.blockType,
         title: input.title,
         description: input.description,
+        // Writing into a slot fills it, lifting a "deliberately empty this
+        // week" left there against the rhythm.
+        suppressed: false,
       };
       await this.repo.update(updated);
       return updated;

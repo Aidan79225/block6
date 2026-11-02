@@ -23,6 +23,9 @@ import type { Project } from "@/domain/entities/project";
 import { createProject } from "@/domain/entities/project";
 import type { ProjectStep } from "@/domain/entities/project-step";
 import { createProjectStep } from "@/domain/entities/project-step";
+import type { Rhythm } from "@/domain/entities/rhythm";
+import { createRhythm } from "@/domain/entities/rhythm";
+import { createRhythmSlot } from "@/domain/entities/rhythm-slot";
 import { parseDateKey, formatDateKey } from "@/lib/date-helpers";
 
 const BLOCK_TYPE_MAP: Record<BlockType, number> = {
@@ -50,6 +53,7 @@ interface DbBlock {
   status: string;
   key_result_id: string | null;
   project_id: string | null;
+  suppressed?: boolean | null;
 }
 
 function dbBlockToEntity(db: DbBlock): Block {
@@ -64,6 +68,7 @@ function dbBlockToEntity(db: DbBlock): Block {
     status: db.status as BlockStatus,
     keyResultId: db.key_result_id ?? null,
     projectId: db.project_id ?? null,
+    suppressed: db.suppressed ?? false,
   });
 }
 
@@ -237,6 +242,67 @@ export async function insertBlocks(
   return (data as DbBlock[]).map((db) => dbBlockToEntity(db));
 }
 
+// --- Rhythm ---
+
+interface DbRhythmSlot {
+  day_of_week: number;
+  slot: number;
+  block_type_id: number;
+  title: string | null;
+  description: string | null;
+}
+
+interface DbRhythmVersion {
+  id: string;
+  user_id: string;
+  effective_from: string;
+  rhythm_slots: DbRhythmSlot[];
+}
+
+function dbRhythmVersionToEntity(db: DbRhythmVersion): Rhythm {
+  return createRhythm({
+    id: db.id,
+    userId: db.user_id,
+    effectiveFrom: db.effective_from,
+    slots: db.rhythm_slots.map((s) =>
+      createRhythmSlot({
+        dayOfWeek: s.day_of_week,
+        slot: s.slot,
+        blockType: BLOCK_TYPE_REVERSE[s.block_type_id] ?? BlockType.Core,
+        title: s.title ?? "",
+        description: s.description ?? "",
+      }),
+    ),
+  });
+}
+
+export async function fetchRhythmHistory(userId: string): Promise<Rhythm[]> {
+  const { data, error } = await supabase
+    .from("rhythm_versions")
+    .select(
+      "id, user_id, effective_from, rhythm_slots(day_of_week, slot, block_type_id, title, description)",
+    )
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  return (data as DbRhythmVersion[]).map(dbRhythmVersionToEntity);
+}
+
+/** Store a rhythm version atomically — see `replace_rhythm` in 013. */
+export async function saveRhythmVersion(rhythm: Rhythm): Promise<void> {
+  const { error } = await supabase.rpc("replace_rhythm", {
+    p_id: rhythm.id,
+    p_effective_from: rhythm.effectiveFrom,
+    p_slots: rhythm.slots.map((s) => ({
+      day_of_week: s.dayOfWeek,
+      slot: s.slot,
+      block_type_id: BLOCK_TYPE_MAP[s.blockType],
+      title: s.title,
+      description: s.description,
+    })),
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteBlock(id: string): Promise<void> {
   const { error } = await supabase.from("blocks").delete().eq("id", id);
   if (error) throw new Error(error.message);
@@ -356,6 +422,7 @@ export async function insertBlockRow(block: Block): Promise<void> {
     status: block.status,
     key_result_id: block.keyResultId,
     project_id: block.projectId,
+    suppressed: block.suppressed,
   });
   if (error) throw new Error(error.message);
 }
@@ -373,6 +440,7 @@ export async function updateBlockRow(block: Block): Promise<void> {
       status: block.status,
       key_result_id: block.keyResultId,
       project_id: block.projectId,
+      suppressed: block.suppressed,
     })
     .eq("id", block.id);
   if (error) throw new Error(error.message);

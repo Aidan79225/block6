@@ -65,4 +65,30 @@ describe("UpdateBlockUseCase", () => {
     expect(repo.update).toHaveBeenCalledOnce();
     expect(repo.save).not.toHaveBeenCalled();
   });
+
+  it("fills a slot that was deliberately emptied this week", async () => {
+    const repo = makeRepo();
+    const suppressed: Block = {
+      id: "block-suppressed",
+      weekPlanId: "week-1",
+      dayOfWeek: 1,
+      slot: 2,
+      blockType: BlockType.Core,
+      title: "健身",
+      description: "",
+      status: BlockStatus.Planned,
+      keyResultId: null,
+      projectId: null,
+      suppressed: true,
+    };
+    vi.mocked(repo.findByWeekPlan).mockResolvedValue([suppressed]);
+    vi.mocked(repo.update).mockResolvedValue(undefined);
+
+    const result = await new UpdateBlockUseCase(repo).execute(baseInput);
+
+    expect(result.suppressed).toBe(false);
+    expect(repo.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "block-suppressed", suppressed: false }),
+    );
+  });
 });
