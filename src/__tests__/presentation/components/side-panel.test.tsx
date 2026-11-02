@@ -105,8 +105,6 @@ describe("SidePanel block deletion", () => {
     title: "專案開發",
     description: "",
     status: BlockStatus.Planned,
-    keyResultId: null,
-    projectId: null,
     suppressed: false,
     regretted: false,
   };

@@ -20,8 +20,6 @@ const existingBlock: Block = {
   title: "Work",
   description: "",
   status: BlockStatus.Planned,
-  keyResultId: null,
-  projectId: null,
   suppressed: false,
   regretted: false,
 };

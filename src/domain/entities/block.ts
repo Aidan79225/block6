@@ -20,8 +20,6 @@ export interface Block {
   readonly title: string;
   readonly description: string;
   readonly status: BlockStatus;
-  readonly keyResultId: string | null;
-  readonly projectId: string | null;
   /**
    * A slot the user deliberately emptied for this week, overriding the
    * recurring rhythm. Suppressed blocks are never shown as blocks.
@@ -40,8 +38,6 @@ export interface CreateBlockInput {
   title: string;
   description: string;
   status: BlockStatus;
-  keyResultId?: string | null;
-  projectId?: string | null;
   suppressed?: boolean;
   regretted?: boolean;
 }
@@ -53,8 +49,6 @@ export function createBlock(input: CreateBlockInput): Block {
     throw new Error("slot must be between 1 and 6");
   return {
     ...input,
-    keyResultId: input.keyResultId ?? null,
-    projectId: input.projectId ?? null,
     suppressed: input.suppressed ?? false,
     regretted: input.regretted ?? false,
   };
