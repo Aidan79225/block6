@@ -14,12 +14,18 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { BlockType } from "@/domain/entities/block";
+import { containsSlot, type SlotPosition } from "@/domain/usecases/slot-range";
 
 interface WeekGridProps {
   blocks: Block[];
   selectedDayOfWeek?: number | null;
   selectedSlot?: number | null;
-  onBlockClick: (dayOfWeek: number, slot: number) => void;
+  /** `extend` is true for Shift+click, which selects a range. */
+  onBlockClick: (dayOfWeek: number, slot: number, extend: boolean) => void;
+  /** Cells of a selected range, highlighted together. */
+  rangeSlots?: readonly SlotPosition[];
+  /** Clicking a day header selects that whole day. */
+  onSelectDay?: (dayOfWeek: number) => void;
   onSwapBlocks: (idA: string, idB: string) => void;
   onMoveBlock: (id: string, dayOfWeek: number, slot: number) => void;
   onToggleComplete?: (blockId: string) => void;
@@ -35,6 +41,14 @@ const typeColorMap: Record<BlockType, string> = {
   [BlockType.Buffer]: "var(--color-block-buffer)",
   [BlockType.General]: "var(--color-block-general)",
 };
+
+const headerStyle = {
+  textAlign: "center",
+  color: "var(--color-text-secondary)",
+  fontSize: "13px",
+  fontWeight: 600,
+  padding: "8px 0",
+} as const;
 
 function parseSlotId(id: string): { day: number; slot: number } | null {
   const m = /^slot-(\d+)-(\d+)$/.exec(id);
@@ -56,6 +70,8 @@ export function WeekGrid({
   onMoveBlock,
   onToggleComplete,
   isRhythmBlock,
+  rangeSlots = [],
+  onSelectDay,
 }: WeekGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -114,20 +130,28 @@ export function WeekGrid({
           flex: 1,
         }}
       >
-        {DAY_LABELS.map((label, i) => (
-          <div
-            key={`header-${i}`}
-            style={{
-              textAlign: "center",
-              color: "var(--color-text-secondary)",
-              fontSize: "13px",
-              fontWeight: 600,
-              padding: "8px 0",
-            }}
-          >
-            {label}
-          </div>
-        ))}
+        {DAY_LABELS.map((label, i) =>
+          onSelectDay ? (
+            <button
+              key={`header-${i}`}
+              onClick={() => onSelectDay(i + 1)}
+              aria-label={`選取週${label}整天`}
+              title="選取整天，一次命名"
+              style={{
+                ...headerStyle,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              {label}
+            </button>
+          ) : (
+            <div key={`header-${i}`} style={headerStyle}>
+              {label}
+            </div>
+          ),
+        )}
         {SLOTS.map((slot) =>
           DAY_LABELS.map((_, dayIndex) => {
             const dayOfWeek = dayIndex + 1;
@@ -139,9 +163,10 @@ export function WeekGrid({
                 dayOfWeek={dayOfWeek}
                 slot={slot}
                 isSelected={
-                  selectedDayOfWeek === dayOfWeek && selectedSlot === slot
+                  (selectedDayOfWeek === dayOfWeek && selectedSlot === slot) ||
+                  containsSlot(rangeSlots, dayOfWeek, slot)
                 }
-                onClick={() => onBlockClick(dayOfWeek, slot)}
+                onClick={(e) => onBlockClick(dayOfWeek, slot, e.shiftKey)}
                 onToggleComplete={
                   block && onToggleComplete
                     ? () => onToggleComplete(block.id)

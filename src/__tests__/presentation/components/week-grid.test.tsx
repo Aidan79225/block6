@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { WeekGrid } from "@/presentation/components/week-grid/week-grid";
 
 describe("WeekGrid", () => {
@@ -32,5 +33,42 @@ describe("WeekGrid", () => {
     );
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(42);
+  });
+
+  it("reports Shift+click so the page can select a range", async () => {
+    const user = userEvent.setup();
+    const onBlockClick = vi.fn();
+    render(
+      <WeekGrid
+        blocks={[]}
+        onBlockClick={onBlockClick}
+        onSwapBlocks={() => {}}
+        onMoveBlock={() => {}}
+      />,
+    );
+    const cells = screen.getAllByRole("button");
+    await user.click(cells[0]);
+    await user.keyboard("{Shift>}");
+    await user.click(cells[8]);
+    await user.keyboard("{/Shift}");
+
+    expect(onBlockClick).toHaveBeenNthCalledWith(1, 1, 1, false);
+    expect(onBlockClick).toHaveBeenNthCalledWith(2, 2, 2, true);
+  });
+
+  it("selects a whole day from its header", async () => {
+    const user = userEvent.setup();
+    const onSelectDay = vi.fn();
+    render(
+      <WeekGrid
+        blocks={[]}
+        onBlockClick={() => {}}
+        onSwapBlocks={() => {}}
+        onMoveBlock={() => {}}
+        onSelectDay={onSelectDay}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "選取週三整天" }));
+    expect(onSelectDay).toHaveBeenCalledWith(3);
   });
 });
